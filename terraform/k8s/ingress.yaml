@@ -1,0 +1,83 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dify-ingress
+  namespace: dify
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "dify-static-ip"
+    networking.gke.io/managed-certificates: "dify-certificate"
+    kubernetes.io/ingress.allow-http: "true"
+spec:
+  rules:
+  - host: your-domain.com  # Change to your domain
+    http:
+      paths:
+      - path: /console/api/*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: api
+            port:
+              number: 5001
+      - path: /api/*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: api
+            port:
+              number: 5001
+      - path: /v1/*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: api
+            port:
+              number: 5001
+      - path: /files/*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: api
+            port:
+              number: 5001
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: web
+            port:
+              number: 3000
+
+---
+# Google-managed SSL certificate
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: dify-certificate
+  namespace: dify
+spec:
+  domains:
+    - your-domain.com  # Change to your domain
+
+---
+# BackendConfig for health checks and other settings
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: dify-backend-config
+  namespace: dify
+spec:
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /health
+    port: 5001
+  connectionDraining:
+    drainingTimeoutSec: 60
+  sessionAffinity:
+    affinityType: "CLIENT_IP"
+    affinityCookieTtlSec: 3600

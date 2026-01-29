@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dify-storage-pvc
+  namespace: dify
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: standard-rwx
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dify-plugin-storage-pvc
+  namespace: dify
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: standard-rwx
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Note: For ReadWriteMany access mode, you may need to use Filestore
+# or create a custom StorageClass with NFS provisioner
+# Standard GKE storage classes only support ReadWriteOnce

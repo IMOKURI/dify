@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ssrf-proxy
+  namespace: dify
+  labels:
+    app: ssrf-proxy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ssrf-proxy
+  template:
+    metadata:
+      labels:
+        app: ssrf-proxy
+    spec:
+      containers:
+      - name: ssrf-proxy
+        image: ubuntu/squid:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3128
+          name: http
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: dify-config
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: squid-config
+          mountPath: /etc/squid/squid.conf
+          subPath: squid.conf
+      volumes:
+      - name: squid-config
+        configMap:
+          name: ssrf-proxy-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ssrf-proxy
+  namespace: dify
+  labels:
+    app: ssrf-proxy
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3128
+    targetPort: 3128
+    protocol: TCP
+    name: http
+  selector:
+    app: ssrf-proxy
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ssrf-proxy-config
+  namespace: dify
+data:
+  squid.conf: |
+    http_port 3128
+    
+    # Allow all traffic (adjust based on security requirements)
+    acl localnet src 10.0.0.0/8
+    acl localnet src 172.16.0.0/12
+    acl localnet src 192.168.0.0/16
+    
+    acl SSL_ports port 443
+    acl Safe_ports port 80
+    acl Safe_ports port 443
+    acl CONNECT method CONNECT
+    
+    http_access deny !Safe_ports
+    http_access deny CONNECT !SSL_ports
+    http_access allow localnet
+    http_access allow localhost
+    http_access deny all
+    
+    coredump_dir /var/spool/squid
+    refresh_pattern ^ftp: 1440 20% 10080
+    refresh_pattern ^gopher: 1440 0% 1440
+    refresh_pattern -i (/cgi-bin/|\?) 0 0% 0
+    refresh_pattern . 0 20% 4320

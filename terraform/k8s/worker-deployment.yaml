@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: dify
+  labels:
+    app: dify-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dify-worker
+  template:
+    metadata:
+      labels:
+        app: dify-worker
+    spec:
+      serviceAccountName: dify-sa
+      containers:
+      - name: worker
+        image: langgenius/dify-api:1.11.4
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: MODE
+          value: "worker"
+        envFrom:
+        - configMapRef:
+            name: dify-config
+        - configMapRef:
+            name: dify-db-config
+        - secretRef:
+            name: dify-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: storage
+          mountPath: /app/api/storage
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: dify-storage-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-beat
+  namespace: dify
+  labels:
+    app: dify-worker-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dify-worker-beat
+  template:
+    metadata:
+      labels:
+        app: dify-worker-beat
+    spec:
+      serviceAccountName: dify-sa
+      containers:
+      - name: worker-beat
+        image: langgenius/dify-api:1.11.4
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: MODE
+          value: "beat"
+        envFrom:
+        - configMapRef:
+            name: dify-config
+        - configMapRef:
+            name: dify-db-config
+        - secretRef:
+            name: dify-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

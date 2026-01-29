@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plugin-daemon
+  namespace: dify
+  labels:
+    app: dify-plugin-daemon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dify-plugin-daemon
+  template:
+    metadata:
+      labels:
+        app: dify-plugin-daemon
+    spec:
+      serviceAccountName: dify-sa
+      containers:
+      - name: plugin-daemon
+        image: langgenius/dify-plugin-daemon:0.5.2-local
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5002
+          name: http
+          protocol: TCP
+        - containerPort: 5003
+          name: debug
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: dify-config
+        - configMapRef:
+            name: dify-db-config
+        - secretRef:
+            name: dify-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: plugin-storage
+          mountPath: /app/storage
+      volumes:
+      - name: plugin-storage
+        persistentVolumeClaim:
+          claimName: dify-plugin-storage-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: plugin-daemon
+  namespace: dify
+  labels:
+    app: dify-plugin-daemon
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5002
+    targetPort: 5002
+    protocol: TCP
+    name: http
+  - port: 5003
+    targetPort: 5003
+    protocol: TCP
+    name: debug
+  selector:
+    app: dify-plugin-daemon
