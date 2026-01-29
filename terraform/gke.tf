@@ -33,7 +33,7 @@ resource "google_project_iam_member" "dify_gke_resource_metadata_writer" {
 # GKE Cluster
 resource "google_container_cluster" "dify_gke" {
   name     = "dify-gke-${var.environment}"
-  location = var.region
+  location = var.zone
 
   # We can't create a cluster with no node pool defined, but we want to only use
   # separately managed node pools. So we create the smallest possible default
@@ -125,7 +125,7 @@ resource "google_container_cluster" "dify_gke" {
 # Node pool
 resource "google_container_node_pool" "dify_node_pool" {
   name       = "dify-node-pool-${var.environment}"
-  location   = var.region
+  location   = var.zone
   cluster    = google_container_cluster.dify_gke.name
   node_count = var.gke_node_count
 

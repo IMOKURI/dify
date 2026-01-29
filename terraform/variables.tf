@@ -31,7 +31,7 @@ variable "db_tier" {
 variable "db_availability_type" {
   description = "Cloud SQL availability type (REGIONAL or ZONAL)"
   type        = string
-  default     = "REGIONAL"
+  default     = "ZONAL"
 }
 
 variable "db_password" {
@@ -70,7 +70,7 @@ variable "gke_machine_type" {
 variable "gke_disk_size_gb" {
   description = "Disk size in GB for GKE nodes"
   type        = number
-  default     = 100
+  default     = 50
 }
 
 variable "gke_min_node_count" {

@@ -7,7 +7,7 @@ resource "google_sql_database_instance" "dify_postgres" {
   settings {
     tier              = var.db_tier
     availability_type = var.db_availability_type
-    disk_size         = 100
+    disk_size         = 50
     disk_type         = "PD_SSD"
 
     backup_configuration {
@@ -23,7 +23,6 @@ resource "google_sql_database_instance" "dify_postgres" {
     ip_configuration {
       ipv4_enabled    = false
       private_network = google_compute_network.dify_vpc.id
-      require_ssl     = true
     }
 
     database_flags {
@@ -48,7 +47,7 @@ resource "google_sql_database_instance" "dify_postgres" {
 
     database_flags {
       name  = "effective_cache_size"
-      value = "4194304" # 4096MB in kB
+      value = "286720" # ~280MB in 8kB pages (within allowed range)
     }
 
     insights_config {
