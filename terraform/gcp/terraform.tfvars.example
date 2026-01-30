@@ -1,0 +1,66 @@
+# Example terraform.tfvars file
+# Copy this file to terraform.tfvars and update the values
+
+# GCP Project Configuration
+project_id = "your-gcp-project-id"
+region     = "asia-northeast1"
+prefix     = "dify"
+
+# Network Configuration
+subnet_cidr        = "10.0.0.0/24"
+ssh_source_ranges  = ["0.0.0.0/0"]  # Restrict this to your IP range
+
+# Database Configuration
+db_tier                 = "db-custom-2-7680"  # 2 vCPUs, 7.5GB RAM
+db_availability_type    = "REGIONAL"           # REGIONAL for HA, ZONAL for cost savings
+db_username             = "postgres"
+db_password             = "your-secure-password-here"  # Change this!
+db_database             = "dify"
+postgres_max_connections = "100"
+
+# Vector Database Configuration
+vector_db_tier     = "db-custom-2-7680"
+pgvector_user      = "postgres"
+pgvector_password  = "your-secure-password-here"  # Change this!
+pgvector_database  = "dify"
+
+# Redis Configuration
+redis_tier           = "STANDARD_HA"  # STANDARD_HA for HA, BASIC for cost savings
+redis_memory_size_gb = 1
+
+# Storage Configuration
+bucket_force_destroy = false
+
+# Compute Engine Configuration
+instance_type      = "e2-standard-4"  # 4 vCPUs, 16GB RAM
+instance_disk_size = 50
+instance_count     = 2
+
+# Autoscaling Configuration
+enable_autoscaling       = true
+autoscaling_min_replicas = 2
+autoscaling_max_replicas = 10
+autoscaling_cpu_target   = 0.7
+
+# Dify Application Configuration
+secret_key = "your-secret-key-here"  # Generate with: openssl rand -base64 42
+init_password = ""  # Optional: Initial admin password
+
+# URLs - Update these after deployment with your load balancer IP or domain
+console_api_url = ""  # e.g., https://api.yourdomain.com
+console_web_url = ""  # e.g., https://console.yourdomain.com
+service_api_url = ""  # e.g., https://api.yourdomain.com
+app_api_url     = ""  # e.g., https://api.yourdomain.com
+app_web_url     = ""  # e.g., https://app.yourdomain.com
+files_url       = ""  # e.g., https://files.yourdomain.com
+
+dify_version = "1.11.4"
+log_level    = "INFO"
+
+# HTTPS Configuration (optional)
+enable_https     = false
+ssl_certificate  = ""  # Path to SSL certificate file
+ssl_private_key  = ""  # Path to SSL private key file
+
+# Deletion Protection
+enable_deletion_protection = true
