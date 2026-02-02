@@ -27,8 +27,3 @@ output "https_url" {
   description = "HTTPS URL to access the application"
   value       = var.domain_name != "" ? "https://${var.domain_name}" : "https://${google_compute_global_address.dify_lb_ip.address}"
 }
-
-output "http_url" {
-  description = "HTTP URL to access the application"
-  value       = var.domain_name != "" ? "http://${var.domain_name}" : "http://${google_compute_global_address.dify_lb_ip.address}"
-}

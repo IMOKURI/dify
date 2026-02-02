@@ -230,12 +230,6 @@ resource "google_compute_target_https_proxy" "dify_https_proxy" {
   ]
 }
 
-# HTTP Proxy (redirects to HTTPS)
-resource "google_compute_target_http_proxy" "dify_http_proxy" {
-  name    = "${var.prefix}-http-proxy"
-  url_map = google_compute_url_map.dify_url_map.id
-}
-
 # Global Forwarding Rule (HTTPS)
 resource "google_compute_global_forwarding_rule" "dify_https_forwarding_rule" {
   name                  = "${var.prefix}-https-forwarding-rule"
@@ -243,15 +237,5 @@ resource "google_compute_global_forwarding_rule" "dify_https_forwarding_rule" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
   port_range            = "443"
   target                = google_compute_target_https_proxy.dify_https_proxy.id
-  ip_address            = google_compute_global_address.dify_lb_ip.id
-}
-
-# Global Forwarding Rule (HTTP)
-resource "google_compute_global_forwarding_rule" "dify_http_forwarding_rule" {
-  name                  = "${var.prefix}-http-forwarding-rule"
-  ip_protocol           = "TCP"
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  port_range            = "80"
-  target                = google_compute_target_http_proxy.dify_http_proxy.id
   ip_address            = google_compute_global_address.dify_lb_ip.id
 }
