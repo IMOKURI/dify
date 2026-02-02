@@ -95,6 +95,27 @@ terraform output
 
 ## デプロイ後の設定
 
+### pgvector拡張機能の有効化
+
+ベクトルデータベースでpgvector拡張機能を有効化します：
+
+```bash
+# Cloud SQL Proxyを使用してデータベースに接続
+gcloud sql connect $(terraform output -raw vector_database_instance_name) --user=postgres
+
+# PostgreSQLに接続後、以下のSQLを実行
+CREATE EXTENSION IF NOT EXISTS vector;
+\q
+```
+
+または、Cloud Shellから直接実行：
+
+```bash
+VECTOR_INSTANCE=$(terraform output -raw vector_database_instance_name)
+PGVECTOR_DB=$(terraform output -raw vector_database_name)
+gcloud sql connect $VECTOR_INSTANCE --user=postgres --database=$PGVECTOR_DB -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
 ### DNSの設定
 
 ロードバランサーのIPアドレスを使用して、DNSレコードを設定します：
