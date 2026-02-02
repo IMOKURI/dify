@@ -131,3 +131,163 @@ variable "db_password" {
   type        = string
   sensitive   = true
 }
+
+# =============================================================================
+# pgvector Configuration
+# =============================================================================
+
+variable "enable_pgvector" {
+  description = "Enable separate pgvector-enabled Cloud SQL instance"
+  type        = bool
+  default     = false
+}
+
+variable "pgvector_database_version" {
+  description = "PostgreSQL version for pgvector Cloud SQL instance (must be 11 or higher for vector support)"
+  type        = string
+  default     = "POSTGRES_16"
+}
+
+variable "pgvector_tier" {
+  description = "Cloud SQL instance tier for pgvector instance"
+  type        = string
+  default     = "db-custom-4-16384" # 4 vCPU, 16GB RAM - recommended for vector operations
+}
+
+variable "pgvector_disk_size" {
+  description = "Cloud SQL disk size in GB for pgvector instance"
+  type        = number
+  default     = 100
+}
+
+variable "pgvector_availability_type" {
+  description = "Availability type for pgvector instance (ZONAL or REGIONAL)"
+  type        = string
+  default     = "ZONAL"
+}
+
+variable "pgvector_deletion_protection" {
+  description = "Enable deletion protection for pgvector instance"
+  type        = bool
+  default     = true
+}
+
+variable "pgvector_backup_enabled" {
+  description = "Enable automated backups for pgvector instance"
+  type        = bool
+  default     = true
+}
+
+variable "pgvector_backup_start_time" {
+  description = "Backup start time for pgvector instance (HH:MM format)"
+  type        = string
+  default     = "04:00"
+}
+
+variable "pgvector_backup_retention_count" {
+  description = "Number of backups to retain for pgvector instance"
+  type        = number
+  default     = 7
+}
+
+variable "pgvector_db_name" {
+  description = "Database name for pgvector"
+  type        = string
+  default     = "dify_vector"
+}
+
+variable "pgvector_db_user" {
+  description = "Database user name for pgvector"
+  type        = string
+  default     = "dify_vector"
+}
+
+variable "pgvector_db_password" {
+  description = "Database password for pgvector (leave empty to auto-generate)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "pgvector_enable_public_ip" {
+  description = "Enable public IP for pgvector instance (not recommended for production)"
+  type        = bool
+  default     = false
+}
+
+variable "pgvector_authorized_networks" {
+  description = "Authorized networks for pgvector instance (only used if public IP is enabled)"
+  type = list(object({
+    name = string
+    cidr = string
+  }))
+  default = []
+}
+
+# Performance tuning variables
+variable "pgvector_max_connections" {
+  description = "Maximum number of connections for pgvector instance"
+  type        = string
+  default     = "200"
+}
+
+variable "pgvector_shared_buffers" {
+  description = "Shared buffers size in KB (should be ~25% of RAM)"
+  type        = string
+  default     = "4194304" # 4GB for 16GB RAM instance
+}
+
+variable "pgvector_effective_cache_size" {
+  description = "Effective cache size in KB (should be ~75% of RAM)"
+  type        = string
+  default     = "12582912" # 12GB for 16GB RAM instance
+}
+
+variable "pgvector_maintenance_work_mem" {
+  description = "Maintenance work memory in KB (for index creation)"
+  type        = string
+  default     = "2097152" # 2GB
+}
+
+variable "pgvector_work_mem" {
+  description = "Work memory in KB (for query operations)"
+  type        = string
+  default     = "10240" # 10MB
+}
+
+variable "pgvector_query_insights_enabled" {
+  description = "Enable Query Insights for pgvector instance"
+  type        = bool
+  default     = true
+}
+
+variable "pgvector_maintenance_window_day" {
+  description = "Maintenance window day (1-7, 1=Monday, 7=Sunday)"
+  type        = number
+  default     = 6 # Saturday
+}
+
+variable "pgvector_maintenance_window_hour" {
+  description = "Maintenance window hour (0-23)"
+  type        = number
+  default     = 4
+}
+
+# Read replica configuration
+variable "pgvector_enable_read_replica" {
+  description = "Enable read replica for pgvector instance"
+  type        = bool
+  default     = false
+}
+
+variable "pgvector_replica_region" {
+  description = "Region for read replica (leave empty to use same region as primary)"
+  type        = string
+  default     = ""
+}
+
+variable "pgvector_replica_tier" {
+  description = "Machine type for read replica (leave empty to use same as primary)"
+  type        = string
+  default     = ""
+}

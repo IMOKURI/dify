@@ -41,3 +41,58 @@ db_name     = "dify"
 db_user     = "dify"
 db_password = "" # Leave empty to generate random password
 
+# =============================================================================
+# pgvector Configuration (Optional)
+# =============================================================================
+
+# Enable separate Cloud SQL instance for pgvector
+# Set to true to create a dedicated PostgreSQL instance with pgvector extension
+enable_pgvector = false
+
+# When enable_pgvector = true, configure the following:
+
+# pgvector_database_version = "POSTGRES_16"  # pgvector requires PostgreSQL 11+
+
+# Instance tier (4 vCPU, 16GB RAM recommended for vector operations)
+# pgvector_tier = "db-custom-4-16384"
+
+# Disk size in GB
+# pgvector_disk_size = 100
+
+# Availability type: ZONAL (single-zone) or REGIONAL (high availability)
+# pgvector_availability_type = "ZONAL"
+
+# Enable deletion protection
+# pgvector_deletion_protection = true
+
+# Database name and credentials
+# pgvector_db_name = "dify_vector"
+# pgvector_db_user = "dify_vector"
+# pgvector_db_password = ""  # Leave empty to auto-generate
+
+# Network configuration
+# pgvector_enable_public_ip = false  # Recommended false for production
+
+# Performance tuning (values for 16GB RAM instance)
+# pgvector_max_connections = "200"
+# pgvector_shared_buffers = "4194304"  # 4GB
+# pgvector_effective_cache_size = "12582912"  # 12GB
+# pgvector_maintenance_work_mem = "2097152"  # 2GB
+# pgvector_work_mem = "10240"  # 10MB
+
+# Backup configuration
+# pgvector_backup_enabled = true
+# pgvector_backup_start_time = "04:00"  # UTC
+# pgvector_backup_retention_count = 7
+
+# Query insights
+# pgvector_query_insights_enabled = true
+
+# Maintenance window
+# pgvector_maintenance_window_day = 6  # Saturday
+# pgvector_maintenance_window_hour = 4  # 4:00 AM
+
+# Read replica (optional)
+# pgvector_enable_read_replica = false
+# pgvector_replica_region = ""  # Leave empty to use same region
+# pgvector_replica_tier = ""  # Leave empty to use same tier as primary

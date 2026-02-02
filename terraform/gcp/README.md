@@ -6,6 +6,7 @@
 
 このTerraformコードは以下のリソースを作成します:
 
+### 基本インフラストラクチャ
 - **VPCネットワーク**: 独立したネットワーク環境
 - **サブネット**: VPC内のサブネット
 - **ファイアウォールルール**: HTTP/HTTPS、SSH、ヘルスチェック用
@@ -17,6 +18,11 @@
 - **インスタンスグループ**: ロードバランサーバックエンド
 - **Cloud SQL PostgreSQL**: マネージドPostgreSQLデータベース
 - **VPCピアリング**: Cloud SQLのプライベート接続
+
+### オプション: pgvector対応Cloud SQL
+- **pgvector拡張機能**: ベクトル類似性検索用の専用PostgreSQLインスタンス
+- **パフォーマンス最適化**: ベクトル演算に最適化された設定
+- **リードレプリカ**: 読み取りスケーリング用（オプション）
 
 ## 前提条件
 
@@ -34,7 +40,7 @@
    gcloud services enable sqladmin.googleapis.com
    ```
 
-## セットアップ手順
+## クイックスタート
 
 ### 1. 変数ファイルの準備
 
@@ -42,83 +48,125 @@
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-`terraform.tfvars`を編集し、以下の値を設定:
+`terraform.tfvars`を編集し、最低限以下の値を設定:
 
 ```hcl
 project_id = "your-gcp-project-id"
 region     = "asia-northeast1"
 zone       = "asia-northeast1-a"
-prefix     = "dify"
 
-# ドメイン名がある場合
+# ドメイン名がある場合（推奨）
 domain_name = "dify.example.com"
 
-# SSHキーを設定する場合
+# または自己署名証明書用の設定
+# domain_name     = ""
+# ssl_certificate = file("certificate.pem")
+# ssl_private_key = file("private-key.pem")
+
+# SSHキー（オプション）
 ssh_public_key = "ssh-rsa AAAAB3... your-email@example.com"
 
-# Cloud SQL設定
-cloudsql_tier = "db-custom-2-7680"  # 2 vCPU, 7.5GB RAM
-db_name       = "dify"
-db_user       = "dify"
-db_password   = ""  # 空の場合はランダムパスワードを生成
+# データベースパスワード（空の場合は自動生成）
+db_password = ""
 ```
 
-### 2. Terraformの初期化
+### 2. デプロイ
 
 ```bash
+# 初期化
 terraform init
-```
 
-### 3. プランの確認
-
-```bash
+# プランの確認
 terraform plan
-```
 
-### 4. インフラストラクチャのデプロイ
-
-```bash
+# デプロイ実行
 terraform apply
 ```
 
-確認を求められたら `yes` を入力します。
-
-### 5. デプロイ完了後の情報確認
+### 3. デプロイ完了後
 
 ```bash
+# 出力情報の確認
 terraform output
+
+# ブラウザでアクセス
+# https://<load_balancer_ip> または https://your-domain.com
 ```
 
-以下のような情報が表示されます:
-- `load_balancer_ip`: ロードバランサーのIPアドレス
-- `vm_instance_ip`: VMインスタンスのIPアドレス
-- `ssh_command`: VMへのSSH接続コマンド
-- `https_url`: アプリケーションのHTTPS URL
-- `cloudsql_connection_name`: Cloud SQL接続名
-- `cloudsql_private_ip`: Cloud SQLのプライベートIPアドレス
-- `database_name`: データベース名
-- `database_url`: データベース接続URL (sensitive)
+## 詳細設定
 
-データベースパスワードを確認:
+### pgvectorの有効化
+
+ベクトル類似性検索が必要な場合、専用のCloud SQLインスタンスを作成できます:
+
+```hcl
+# terraform.tfvars に追加
+enable_pgvector = true
+
+# オプション: カスタム設定
+pgvector_tier = "db-custom-4-16384"  # 4 vCPU, 16GB RAM
+pgvector_disk_size = 100
+pgvector_db_name = "dify_vector"
+pgvector_db_user = "dify_vector"
+pgvector_db_password = ""  # 空の場合は自動生成
+```
+
+pgvectorを有効化した後、拡張機能をインストール:
+
 ```bash
-terraform output database_password
+# Cloud SQL Proxyを使用
+./cloud-sql-proxy $(terraform output -raw pgvector_connection_name)
+
+# 別ターミナルで
+export PGPASSWORD=$(terraform output -raw pgvector_database_password)
+psql -h 127.0.0.1 -U $(terraform output -raw pgvector_database_user) \
+  -d $(terraform output -raw pgvector_database_name) \
+  -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
-## VM へのアクセスとDifyのデプロイ
+### SSL証明書の設定
+
+#### オプション1: Google管理SSL証明書（推奨）
+
+```hcl
+domain_name = "dify.example.com"
+```
+
+DNSレコードを設定:
+```
+A    dify.example.com    <LOAD_BALANCER_IP>
+```
+
+証明書のプロビジョニングは最大15分かかります。
+
+#### オプション2: 自己署名証明書
+
+```bash
+# 証明書の生成
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout private-key.pem -out certificate.pem \
+  -subj "/C=JP/ST=Tokyo/L=Tokyo/O=Dify/CN=dify.local"
+```
+
+```hcl
+domain_name     = ""
+ssl_certificate = file("certificate.pem")
+ssl_private_key = file("private-key.pem")
+```
+
+## Difyのデプロイ
 
 ### VMにSSH接続
 
 ```bash
-# Terraformのoutputから取得したコマンドを使用
-gcloud compute ssh dify-vm --zone asia-northeast1-a --project your-project-id
+# Terraformの出力から取得
+terraform output ssh_command
 
-# または直接SSH
-ssh ubuntu@<VM_INSTANCE_IP>
+# または直接
+gcloud compute ssh dify-vm --zone asia-northeast1-a --project your-project-id
 ```
 
-### Difyのデプロイ
-
-VMに接続後、以下の手順でDifyをデプロイ:
+### Difyのセットアップ
 
 ```bash
 # 作業ディレクトリに移動
@@ -130,24 +178,22 @@ cd dify/docker
 
 # 環境変数を設定
 cp .env.example .env
-
-# Cloud SQLの接続情報を設定
-# Terraformのoutputから取得した値を使用
-DB_USERNAME=dify
-DB_PASSWORD=<terraform output -raw database_password>
-DB_HOST=<terraform output -raw cloudsql_private_ip>
-DB_PORT=5432
-DB_DATABASE=dify
-
-# .envファイルを編集
 nano .env
 
-# 以下の行を更新:
-# DB_USERNAME=dify
-# DB_PASSWORD=<上記で取得したパスワード>
-# DB_HOST=<Cloud SQLのプライベートIP>
+# 以下の設定を更新:
+# DB_USERNAME=<terraform output database_user>
+# DB_PASSWORD=<terraform output -raw database_password>
+# DB_HOST=<terraform output -raw cloudsql_private_ip>
 # DB_PORT=5432
-# DB_DATABASE=dify
+# DB_DATABASE=<terraform output database_name>
+
+# pgvectorを使用する場合は追加:
+# VECTOR_STORE=pgvector
+# PGVECTOR_HOST=<terraform output -raw pgvector_private_ip>
+# PGVECTOR_PORT=5432
+# PGVECTOR_USER=<terraform output pgvector_database_user>
+# PGVECTOR_PASSWORD=<terraform output -raw pgvector_database_password>
+# PGVECTOR_DATABASE=<terraform output pgvector_database_name>
 
 # Docker Composeで起動
 docker-compose up -d
@@ -156,48 +202,336 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-### アクセス確認
+## pgvectorの使用例
 
-ブラウザで以下のURLにアクセス:
-- HTTPSアクセス: `https://<LOAD_BALANCER_IP>` または `https://your-domain.com`
+### テーブルの作成
 
-## SSL証明書の設定
+```sql
+-- 1536次元のベクトル列を持つテーブル（OpenAI embeddings用）
+CREATE TABLE documents (
+  id BIGSERIAL PRIMARY KEY,
+  content TEXT,
+  embedding vector(1536),
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
 
-### オプション1: Google管理SSL証明書 (推奨)
+-- HNSWインデックスの作成（推奨）
+CREATE INDEX ON documents USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
 
-ドメイン名を持っている場合:
+-- または IVFFlatインデックス（大規模データセット用）
+-- CREATE INDEX ON documents USING ivfflat (embedding vector_cosine_ops)
+-- WITH (lists = 100);
+```
 
-1. `terraform.tfvars`で`domain_name`を設定
-2. DNSレコードを設定してドメインをロードバランサーIPに向ける
-3. Googleが自動的に証明書をプロビジョニング (最大15分かかる場合があります)
+### 類似検索
+
+```sql
+-- コサイン類似度による検索
+SELECT id, content, 1 - (embedding <=> '[0.1, 0.2, ...]'::vector) AS similarity
+FROM documents
+ORDER BY embedding <=> '[0.1, 0.2, ...]'::vector
+LIMIT 10;
+
+-- L2距離による検索
+SELECT id, content, embedding <-> '[0.1, 0.2, ...]'::vector AS distance
+FROM documents
+ORDER BY embedding <-> '[0.1, 0.2, ...]'::vector
+LIMIT 10;
+```
+
+## パフォーマンスチューニング
+
+### 推奨インスタンスサイズ
+
+| ユースケース | VM | Cloud SQL | pgvector (オプション) |
+|------------|-----|-----------|---------------------|
+| 開発/テスト | n1-standard-2 | db-custom-2-7680 | db-custom-2-8192 |
+| 小規模本番 | n1-standard-2 | db-custom-2-7680 | db-custom-4-16384 |
+| 中規模本番 | n1-standard-4 | db-custom-4-15360 | db-custom-8-32768 |
+| 大規模本番 | n1-standard-8 | db-custom-8-30720 | db-custom-16-65536 |
+
+### pgvectorのパフォーマンス設定
+
+16GB RAMインスタンス用の推奨値:
 
 ```hcl
-domain_name = "dify.example.com"
+pgvector_shared_buffers = "4194304"       # 4GB (RAMの25%)
+pgvector_effective_cache_size = "12582912" # 12GB (RAMの75%)
+pgvector_maintenance_work_mem = "2097152"  # 2GB
+pgvector_work_mem = "10240"                # 10MB
 ```
 
-DNSレコード例:
-```
-A    dify.example.com    <LOAD_BALANCER_IP>
+## 高可用性構成
+
+### Cloud SQLの高可用性
+
+```hcl
+# main.tfの google_sql_database_instance リソースで
+availability_type = "REGIONAL"  # ZONALからREGIONALに変更
 ```
 
-### オプション2: 自己署名証明書
+### pgvectorのリードレプリカ
 
-テスト環境や内部利用の場合:
+```hcl
+pgvector_enable_read_replica = true
+pgvector_replica_region = "us-central1"  # オプション: 別リージョン
+pgvector_replica_tier = "db-custom-2-8192"  # オプション: 小さいマシンタイプ
+```
+
+## トラブルシューティング
+
+### Cloud SQLへの接続確認
 
 ```bash
-# 自己署名証明書を生成
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout private-key.pem \
-  -out certificate.pem \
-  -subj "/C=JP/ST=Tokyo/L=Tokyo/O=Dify/CN=dify.local"
+# VMからCloud SQLに接続テスト
+gcloud compute ssh dify-vm --zone asia-northeast1-a
+
+# PostgreSQLクライアントをインストール
+sudo apt-get update
+sudo apt-get install -y postgresql-client
+
+# 基本DBに接続
+psql "$(terraform output -raw database_url)"
+
+# pgvectorに接続（有効化している場合）
+psql "$(terraform output -raw pgvector_database_url)"
 ```
 
-`terraform.tfvars`に追加:
-```hcl
-domain_name     = ""
-ssl_certificate = file("certificate.pem")
-ssl_private_key = file("private-key.pem")
+### Cloud SQLの状態確認
+
+```bash
+# インスタンスの一覧
+gcloud sql instances list
+
+# インスタンスの詳細
+gcloud sql instances describe $(terraform output -raw cloudsql_instance_name)
+
+# pgvectorインスタンスの詳細（有効化している場合）
+gcloud sql instances describe $(terraform output -raw pgvector_instance_name)
 ```
+
+### ヘルスチェックが失敗する
+
+```bash
+# VMにSSH接続
+gcloud compute ssh dify-vm --zone asia-northeast1-a
+
+# Dockerコンテナの状態確認
+cd /opt/dify/dify/docker
+docker-compose ps
+
+# ログ確認
+docker-compose logs -f
+```
+
+### SSL証明書のプロビジョニング確認
+
+```bash
+# 証明書の状態確認
+gcloud compute ssl-certificates list
+gcloud compute ssl-certificates describe dify-ssl-cert --global
+```
+
+### pgvector拡張機能の確認
+
+```sql
+-- 利用可能な拡張機能を確認
+SELECT * FROM pg_available_extensions WHERE name = 'vector';
+
+-- インストール済み拡張機能を確認
+\dx vector
+
+-- PostgreSQLバージョンを確認（11以降が必要）
+SELECT version();
+```
+
+### パフォーマンス問題（pgvector）
+
+```sql
+-- インデックスの使用状況を確認
+EXPLAIN ANALYZE
+SELECT * FROM documents
+ORDER BY embedding <=> '[0.1, 0.2, ...]'::vector
+LIMIT 10;
+
+-- 統計情報の更新
+ANALYZE documents;
+
+-- インデックスの再構築
+REINDEX INDEX <index_name>;
+```
+
+## セキュリティのベストプラクティス
+
+1. **SSH接続の制限**: `ssh_source_ranges`を特定のIPに限定
+   ```hcl
+   ssh_source_ranges = ["203.0.113.0/24"]
+   ```
+
+2. **プライベートIP接続**: Cloud SQLはプライベートIPのみを使用
+   ```hcl
+   pgvector_enable_public_ip = false
+   ```
+
+3. **強力なパスワード**: 自動生成を使用するか、強力なパスワードを設定
+
+4. **削除保護**: 本番環境では有効化
+   ```hcl
+   deletion_protection = true
+   pgvector_deletion_protection = true
+   ```
+
+5. **バックアップ**: 定期的なバックアップを有効化
+   ```hcl
+   cloudsql_backup_enabled = true
+   pgvector_backup_enabled = true
+   ```
+
+6. **監査ログ**: Cloud Auditログを有効化
+   ```hcl
+   cloudsql.enable_pgaudit = "on"
+   ```
+
+## モニタリング
+
+### Cloud Monitoringでの確認項目
+
+- **Database connections**: 接続数の監視
+- **CPU utilization**: CPUの使用率
+- **Memory utilization**: メモリの使用率
+- **Disk utilization**: ディスクの使用率
+- **Replication lag**: レプリカの遅延（リードレプリカ使用時）
+
+### Query Insightsの活用
+
+```bash
+# GCPコンソールで確認
+# Cloud SQL > [インスタンス名] > Query Insights
+```
+
+Query Insightsを有効化:
+```hcl
+pgvector_query_insights_enabled = true
+```
+
+## コスト最適化
+
+### 開発環境
+
+```hcl
+# 小さいインスタンス
+machine_type = "n1-standard-1"
+cloudsql_tier = "db-custom-1-3840"
+pgvector_tier = "db-custom-2-8192"
+
+# バックアップを無効化
+cloudsql_backup_enabled = false
+pgvector_backup_enabled = false
+
+# 削除保護を無効化
+deletion_protection = false
+pgvector_deletion_protection = false
+
+# Query Insightsを無効化
+pgvector_query_insights_enabled = false
+```
+
+### 本番環境
+
+```hcl
+# 適切なサイズのインスタンス
+machine_type = "n1-standard-2"
+cloudsql_tier = "db-custom-2-7680"
+pgvector_tier = "db-custom-4-16384"
+
+# バックアップを有効化
+cloudsql_backup_enabled = true
+pgvector_backup_enabled = true
+pgvector_backup_retention_count = 7
+
+# 削除保護を有効化
+deletion_protection = true
+pgvector_deletion_protection = true
+
+# Query Insightsを有効化
+pgvector_query_insights_enabled = true
+
+# 高可用性（オプション）
+availability_type = "REGIONAL"
+pgvector_availability_type = "REGIONAL"
+```
+
+### その他のコスト削減
+
+- **Committed Use Discounts**: 1年または3年の契約で割引
+- **スケジューリング**: 夜間や週末にVMを停止
+- **ディスク最適化**: 必要なサイズのみを使用
+- **リージョン選択**: コストの低いリージョンを選択
+
+## リソースの削除
+
+```bash
+# 削除保護を無効化
+# terraform.tfvars または main.tf で deletion_protection = false に設定
+
+terraform apply
+
+# すべてのリソースを削除
+terraform destroy
+```
+
+## 変数一覧
+
+### 基本設定
+- `project_id`: GCPプロジェクトID（必須）
+- `region`: リージョン（デフォルト: asia-northeast1）
+- `zone`: ゾーン（デフォルト: asia-northeast1-a）
+- `prefix`: リソース名のプレフィックス（デフォルト: dify）
+
+### ネットワーク設定
+- `subnet_cidr`: サブネットのCIDR範囲
+- `ssh_source_ranges`: SSH接続を許可するCIDR範囲
+
+### VM設定
+- `machine_type`: VMのマシンタイプ
+- `disk_size_gb`: ブートディスクのサイズ（GB）
+- `ssh_user`: SSHユーザー名
+- `ssh_public_key`: SSH公開鍵
+
+### SSL設定
+- `domain_name`: ドメイン名（Google管理証明書用）
+- `ssl_certificate`: 自己署名証明書（PEM形式）
+- `ssl_private_key`: 自己署名証明書の秘密鍵
+
+### Cloud SQL設定
+- `cloudsql_tier`: Cloud SQLのマシンタイプ
+- `cloudsql_disk_size`: ディスクサイズ（GB）
+- `cloudsql_database_version`: PostgreSQLバージョン
+- `cloudsql_backup_enabled`: バックアップの有効化
+- `db_name`: データベース名
+- `db_user`: データベースユーザー名
+- `db_password`: データベースパスワード
+
+### pgvector設定
+- `enable_pgvector`: pgvectorインスタンスの有効化（デフォルト: false）
+- `pgvector_tier`: pgvectorのマシンタイプ
+- `pgvector_disk_size`: ディスクサイズ（GB）
+- `pgvector_database_version`: PostgreSQLバージョン
+- `pgvector_db_name`: データベース名
+- `pgvector_db_user`: データベースユーザー名
+- `pgvector_db_password`: データベースパスワード
+- 他の設定は`terraform.tfvars.example`を参照
+
+## 参考リンク
+
+- [Terraform Google Provider Documentation](https://registry.terraform.io/providers/hashicorp/google/latest/docs)
+- [Dify Documentation](https://docs.dify.ai/)
+- [GCP Load Balancer Documentation](https://cloud.google.com/load-balancing/docs)
+- [Cloud SQL for PostgreSQL](https://cloud.google.com/sql/docs/postgres)
+- [pgvector GitHub](https://github.com/pgvector/pgvector)
+- [PostgreSQL Extensions on Cloud SQL](https://cloud.google.com/sql/docs/postgres/extensions)
 
 ## リソースの削除
 
