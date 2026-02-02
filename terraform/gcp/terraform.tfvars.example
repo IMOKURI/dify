@@ -73,12 +73,9 @@ enable_pgvector = false
 # Network configuration
 # pgvector_enable_public_ip = false  # Recommended false for production
 
-# Performance tuning (values for 16GB RAM instance)
+# Performance tuning
+# Note: Cloud SQL auto-manages memory settings based on instance tier
 # pgvector_max_connections = "200"
-# pgvector_shared_buffers = "4194304"  # 4GB
-# pgvector_effective_cache_size = "12582912"  # 12GB
-# pgvector_maintenance_work_mem = "2097152"  # 2GB
-# pgvector_work_mem = "10240"  # 10MB
 
 # Backup configuration
 # pgvector_backup_enabled = true

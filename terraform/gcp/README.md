@@ -254,14 +254,20 @@ LIMIT 10;
 
 ### pgvectorのパフォーマンス設定
 
-16GB RAMインスタンス用の推奨値:
+Cloud SQLではインスタンスタイプ（tier）に応じてメモリ設定が自動的に最適化されます。手動でのメモリチューニングは不要です。
+
+設定可能なパフォーマンスパラメータ:
 
 ```hcl
-pgvector_shared_buffers = "4194304"       # 4GB (RAMの25%)
-pgvector_effective_cache_size = "12582912" # 12GB (RAMの75%)
-pgvector_maintenance_work_mem = "2097152"  # 2GB
-pgvector_work_mem = "10240"                # 10MB
+pgvector_max_connections = "200"  # 最大接続数
+pgvector_tier = "db-custom-4-16384"  # インスタンスサイズ（4 vCPU, 16GB RAM）
 ```
+
+**自動管理されるパラメータ:**
+- `shared_buffers`: インスタンスRAMの約25%に自動設定
+- `effective_cache_size`: インスタンスRAMの約75%に自動設定
+- `maintenance_work_mem`: インデックス作成用に自動最適化
+- `work_mem`: クエリ実行用に自動最適化
 
 ## 高可用性構成
 

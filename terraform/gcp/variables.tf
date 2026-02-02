@@ -225,35 +225,19 @@ variable "pgvector_authorized_networks" {
 }
 
 # Performance tuning variables
+# Note: Cloud SQL auto-manages memory settings based on instance tier
 variable "pgvector_max_connections" {
   description = "Maximum number of connections for pgvector instance"
   type        = string
   default     = "200"
 }
 
-variable "pgvector_shared_buffers" {
-  description = "Shared buffers size in KB (should be ~25% of RAM)"
-  type        = string
-  default     = "4194304" # 4GB for 16GB RAM instance
-}
-
-variable "pgvector_effective_cache_size" {
-  description = "Effective cache size in KB (should be ~75% of RAM)"
-  type        = string
-  default     = "12582912" # 12GB for 16GB RAM instance
-}
-
-variable "pgvector_maintenance_work_mem" {
-  description = "Maintenance work memory in KB (for index creation)"
-  type        = string
-  default     = "2097152" # 2GB
-}
-
-variable "pgvector_work_mem" {
-  description = "Work memory in KB (for query operations)"
-  type        = string
-  default     = "10240" # 10MB
-}
+# The following memory settings are automatically managed by Cloud SQL
+# based on the instance tier. They cannot be manually configured.
+# - shared_buffers (auto-configured ~25% of RAM)
+# - effective_cache_size (auto-configured ~75% of RAM)
+# - maintenance_work_mem (auto-configured for index creation)
+# - work_mem (auto-configured for query operations)
 
 variable "pgvector_query_insights_enabled" {
   description = "Enable Query Insights for pgvector instance"

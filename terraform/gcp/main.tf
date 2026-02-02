@@ -398,42 +398,14 @@ resource "google_sql_database_instance" "dify_pgvector" {
     }
 
     # Database flags for pgvector optimization
+    # Note: Cloud SQL auto-manages memory settings based on instance tier
     database_flags {
       name  = "max_connections"
       value = var.pgvector_max_connections
     }
 
-    database_flags {
-      name  = "shared_preload_libraries"
-      value = "vector"
-    }
-
-    # Memory and performance tuning for vector operations
-    database_flags {
-      name  = "shared_buffers"
-      value = var.pgvector_shared_buffers
-    }
-
-    database_flags {
-      name  = "effective_cache_size"
-      value = var.pgvector_effective_cache_size
-    }
-
-    database_flags {
-      name  = "maintenance_work_mem"
-      value = var.pgvector_maintenance_work_mem
-    }
-
-    database_flags {
-      name  = "work_mem"
-      value = var.pgvector_work_mem
-    }
-
-    # Additional recommended settings
-    database_flags {
-      name  = "random_page_cost"
-      value = "1.1"
-    }
+    # pgvector extension is automatically available in Cloud SQL PostgreSQL 11+
+    # No need to set shared_preload_libraries
 
     database_flags {
       name  = "cloudsql.enable_pgaudit"
