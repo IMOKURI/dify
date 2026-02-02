@@ -13,9 +13,11 @@
 - **Cloud Storage**: ファイルストレージ
 
 ### コンピューティング
-- **Compute Engine (Managed Instance Group)**: Difyアプリケーション（api, worker, worker_beat, web, sandbox, plugin_daemon, ssrf_proxy, nginx）をDocker Composeで実行
+- **Compute Engine (Managed Instance Group)**: Difyアプリケーションのホスティング環境（Docker, Docker Compose, PostgreSQLクライアント等を自動セットアップ）
 - **Autoscaling**: CPU使用率に基づいて自動的にインスタンス数を調整
 - **Cloud Load Balancer**: HTTPSトラフィックを複数のインスタンスに分散
+
+**注意**: Difyアプリケーション本体は[GitHubリリースページ](https://github.com/langgenius/dify/releases)から最新版が自動ダウンロードされますが、設定と起動は手動で行う必要があります。
 
 ### ネットワーク
 - **VPC Network**: プライベートネットワーク
@@ -95,20 +97,53 @@ terraform output
 
 ## デプロイ後の設定
 
-### 初回起動の確認
+### Difyのセットアップ（手動）
 
-インスタンスの起動時に、pgvector拡張機能が自動的に有効化されます。起動ログを確認できます：
+Terraformでインフラがデプロイされた後、各インスタンスでDifyの設定と起動を手動で行う必要があります：
 
-```bash
-# インスタンスグループの最初のインスタンスを取得
-REGION=$(terraform output -raw region)
-MIG_NAME=$(terraform output -raw instance_group_manager_name)
-INSTANCE_NAME=$(gcloud compute instance-groups managed list-instances $MIG_NAME --region=$REGION --format="value(instance.basename())" --limit=1)
+1. **インスタンスへの接続**:
+   ```bash
+   # インスタンスグループの最初のインスタンスを取得
+   REGION=$(terraform output -raw region)
+   MIG_NAME=$(terraform output -raw instance_group_manager_name)
+   INSTANCE_NAME=$(gcloud compute instance-groups managed list-instances $MIG_NAME --region=$REGION --format="value(instance.basename())" --limit=1)
+   ZONE=$(terraform output -raw primary_zone)
+   
+   # SSHで接続
+   gcloud compute ssh $INSTANCE_NAME --zone=$ZONE
+   ```
 
-# シリアルポート出力でログを確認
-ZONE=$(terraform output -raw primary_zone)
-gcloud compute instances get-serial-port-output $INSTANCE_NAME --zone=$ZONE | grep -i pgvector
-```
+2. **Difyのダウンロード確認**:
+   ```bash
+   # Difyがダウンロードされていることを確認
+   ls -la /opt/dify/
+   ```
+
+3. **環境設定ファイルの作成**:
+   ```bash
+   cd /opt/dify/docker
+   # .envファイルを作成し、必要な環境変数を設定
+   # Terraformの出力値を参照してください
+   ```
+
+4. **Difyの起動**:
+   ```bash
+   # Docker Composeでサービスを起動
+   docker-compose up -d
+   ```
+
+5. **起動確認**:
+   ```bash
+   # サービスが正常に起動しているか確認
+   docker-compose ps
+   docker-compose logs
+   ```
+
+**注意**: スタートアップスクリプトでは以下が自動的に実行されます：
+- Docker と Docker Composeのインストール
+- PostgreSQLクライアントのインストール
+- pgvector拡張機能の有効化
+- GitHubから最新のDifyリリースをダウンロード (`/opt/dify`)
 
 ### DNSの設定
 
@@ -181,19 +216,42 @@ Google Cloud Consoleで以下をモニタリングできます：
 
 ### アップグレード
 
-Difyのバージョンをアップグレードする場合：
+Difyのバージョンをアップグレードする場合は、各インスタンスで手動で行います：
 
-1. `terraform.tfvars`を更新：
-   ```hcl
-   dify_version = "1.12.0"  # 新しいバージョン
-   ```
-
-2. 変更を適用：
+1. **インスタンスに接続**:
    ```bash
-   terraform apply
+   gcloud compute ssh INSTANCE_NAME --zone=ZONE
    ```
 
-インスタンスは自動的にローリングアップデートされます。
+2. **新しいバージョンをダウンロード**:
+   ```bash
+   cd /opt/dify
+   # 現在のサービスを停止
+   docker-compose down
+   
+   # 既存のファイルをバックアップ
+   sudo mv /opt/dify /opt/dify.backup
+   
+   # 新しいバージョンをダウンロード
+   sudo mkdir -p /opt/dify
+   cd /opt/dify
+   DIFY_VERSION="0.15.0"  # 希望のバージョン
+   curl -L "https://github.com/langgenius/dify/archive/refs/tags/$DIFY_VERSION.zip" -o dify.zip
+   unzip -q dify.zip
+   rm dify.zip
+   mv dify-*/* .
+   rmdir dify-*/
+   ```
+
+3. **設定ファイルを復元して起動**:
+   ```bash
+   # 必要に応じて設定ファイルを復元
+   # サービスを再起動
+   cd /opt/dify/docker
+   docker-compose up -d
+   ```
+
+**注意**: すべてのインスタンスで同じバージョンを実行することを推奨します。
 
 ## コスト最適化
 
@@ -228,14 +286,17 @@ enable_deletion_protection = true
 ### インスタンスが起動しない
 
 ```bash
-# インスタンスのシリアルポート出力を確認
+# インスタンスのシリアルポート出力を確認（スタートアップスクリプトのログ）
 gcloud compute instances get-serial-port-output INSTANCE_NAME
 
 # SSHでインスタンスに接続
 gcloud compute ssh INSTANCE_NAME
 
-# Docker Composeのログを確認
-cd /opt/dify
+# Difyがダウンロードされているか確認
+ls -la /opt/dify/
+
+# Docker Composeのログを確認（Difyを起動している場合）
+cd /opt/dify/docker
 sudo docker-compose logs
 ```
 
