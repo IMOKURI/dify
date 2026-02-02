@@ -35,7 +35,7 @@ resource "google_compute_firewall" "allow_lb" {
 
   allow {
     protocol = "tcp"
-    ports    = ["80", "443"]
+    ports    = ["1080", "443"]
   }
 
   source_ranges = ["130.211.0.0/22", "35.191.0.0/16"] # Google Cloud Load Balancer IP ranges
@@ -63,7 +63,7 @@ resource "google_compute_firewall" "allow_health_check" {
 
   allow {
     protocol = "tcp"
-    ports    = ["80"]
+    ports    = ["1080"]
   }
 
   source_ranges = ["35.191.0.0/16", "130.211.0.0/22"]
@@ -148,7 +148,7 @@ resource "google_compute_instance_group" "dify_ig" {
 
   named_port {
     name = "http"
-    port = "80"
+    port = "1080"
   }
 
   lifecycle {
@@ -165,7 +165,7 @@ resource "google_compute_health_check" "dify_health_check" {
   unhealthy_threshold = 3
 
   http_health_check {
-    port         = 80
+    port         = 1080
     request_path = "/health"
   }
 }

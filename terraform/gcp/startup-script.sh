@@ -37,7 +37,7 @@ apt-get install -y nginx
 # Configure Nginx as reverse proxy
 cat > /etc/nginx/sites-available/dify << 'EOF'
 server {
-    listen 80;
+    listen 1080;
     server_name _;
 
     client_max_body_size 100M;
@@ -49,7 +49,7 @@ server {
     }
 
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:80;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
