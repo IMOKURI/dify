@@ -8,7 +8,8 @@ apt-get install -y \
     curl \
     gnupg \
     lsb-release \
-    jq
+    jq \
+    postgresql-client
 
 # Install Docker
 curl -fsSL https://get.docker.com -o get-docker.sh
@@ -319,6 +320,12 @@ mkdir -p /opt/dify/sandbox/dependencies
 mkdir -p /opt/dify/sandbox/conf
 mkdir -p /opt/dify/plugin_daemon
 chown -R 1001:1001 /opt/dify/storage
+
+# Enable pgvector extension
+echo "Enabling pgvector extension..."
+export PGPASSWORD='${pgvector_password}'
+psql -h ${pgvector_host} -U ${pgvector_user} -d ${pgvector_database} -c "CREATE EXTENSION IF NOT EXISTS vector;" || true
+unset PGPASSWORD
 
 # Start services
 cd /opt/dify

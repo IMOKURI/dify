@@ -73,3 +73,13 @@ output "access_url_https" {
   description = "HTTPS URL to access the Dify application (if HTTPS is enabled)"
   value       = var.enable_https ? "https://${google_compute_global_address.dify_lb.address}" : "HTTPS not enabled"
 }
+
+output "region" {
+  description = "GCP region where resources are deployed"
+  value       = var.region
+}
+
+output "primary_zone" {
+  description = "Primary zone for compute instances"
+  value       = "${var.region}-a"
+}

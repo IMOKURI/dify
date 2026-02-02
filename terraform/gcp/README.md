@@ -95,25 +95,19 @@ terraform output
 
 ## デプロイ後の設定
 
-### pgvector拡張機能の有効化
+### 初回起動の確認
 
-ベクトルデータベースでpgvector拡張機能を有効化します：
-
-```bash
-# Cloud SQL Proxyを使用してデータベースに接続
-gcloud sql connect $(terraform output -raw vector_database_instance_name) --user=postgres
-
-# PostgreSQLに接続後、以下のSQLを実行
-CREATE EXTENSION IF NOT EXISTS vector;
-\q
-```
-
-または、Cloud Shellから直接実行：
+インスタンスの起動時に、pgvector拡張機能が自動的に有効化されます。起動ログを確認できます：
 
 ```bash
-VECTOR_INSTANCE=$(terraform output -raw vector_database_instance_name)
-PGVECTOR_DB=$(terraform output -raw vector_database_name)
-gcloud sql connect $VECTOR_INSTANCE --user=postgres --database=$PGVECTOR_DB -c "CREATE EXTENSION IF NOT EXISTS vector;"
+# インスタンスグループの最初のインスタンスを取得
+REGION=$(terraform output -raw region)
+MIG_NAME=$(terraform output -raw instance_group_manager_name)
+INSTANCE_NAME=$(gcloud compute instance-groups managed list-instances $MIG_NAME --region=$REGION --format="value(instance.basename())" --limit=1)
+
+# シリアルポート出力でログを確認
+ZONE=$(terraform output -raw primary_zone)
+gcloud compute instances get-serial-port-output $INSTANCE_NAME --zone=$ZONE | grep -i pgvector
 ```
 
 ### DNSの設定
