@@ -82,3 +82,52 @@ variable "docker_compose_version" {
   type        = string
   default     = "v2.24.5"
 }
+
+# Cloud SQL Variables
+variable "cloudsql_tier" {
+  description = "Cloud SQL instance tier"
+  type        = string
+  default     = "db-custom-2-7680" # 2 vCPU, 7.5GB RAM
+}
+
+variable "cloudsql_disk_size" {
+  description = "Cloud SQL disk size in GB"
+  type        = number
+  default     = 50
+}
+
+variable "cloudsql_database_version" {
+  description = "PostgreSQL version for Cloud SQL"
+  type        = string
+  default     = "POSTGRES_15"
+}
+
+variable "cloudsql_backup_enabled" {
+  description = "Enable automated backups"
+  type        = bool
+  default     = true
+}
+
+variable "cloudsql_backup_start_time" {
+  description = "Backup start time (HH:MM format)"
+  type        = string
+  default     = "03:00"
+}
+
+variable "db_name" {
+  description = "Database name"
+  type        = string
+  default     = "dify"
+}
+
+variable "db_user" {
+  description = "Database user name"
+  type        = string
+  default     = "dify"
+}
+
+variable "db_password" {
+  description = "Database password"
+  type        = string
+  sensitive   = true
+}

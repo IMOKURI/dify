@@ -5,6 +5,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }
 
@@ -238,4 +242,92 @@ resource "google_compute_global_forwarding_rule" "dify_https_forwarding_rule" {
   port_range            = "443"
   target                = google_compute_target_https_proxy.dify_https_proxy.id
   ip_address            = google_compute_global_address.dify_lb_ip.id
+}
+
+# Random password for Cloud SQL (if not provided)
+resource "random_password" "db_password" {
+  count   = var.db_password == "" ? 1 : 0
+  length  = 32
+  special = true
+}
+
+# Cloud SQL PostgreSQL Instance
+resource "google_sql_database_instance" "dify_postgres" {
+  name             = "${var.prefix}-postgres"
+  database_version = var.cloudsql_database_version
+  region           = var.region
+  
+  deletion_protection = true
+
+  settings {
+    tier              = var.cloudsql_tier
+    disk_size         = var.cloudsql_disk_size
+    disk_type         = "PD_SSD"
+    availability_type = "ZONAL" # Use REGIONAL for high availability
+    
+    backup_configuration {
+      enabled                        = var.cloudsql_backup_enabled
+      start_time                     = var.cloudsql_backup_start_time
+      point_in_time_recovery_enabled = true
+      transaction_log_retention_days = 7
+      backup_retention_settings {
+        retained_backups = 7
+        retention_unit   = "COUNT"
+      }
+    }
+
+    ip_configuration {
+      ipv4_enabled    = false
+      private_network = google_compute_network.dify_network.id
+      require_ssl     = false
+    }
+
+    database_flags {
+      name  = "max_connections"
+      value = "100"
+    }
+
+    database_flags {
+      name  = "cloudsql.enable_pgaudit"
+      value = "on"
+    }
+
+    maintenance_window {
+      day          = 7 # Sunday
+      hour         = 3
+      update_track = "stable"
+    }
+  }
+
+  depends_on = [
+    google_service_networking_connection.private_vpc_connection
+  ]
+}
+
+# Database
+resource "google_sql_database" "dify_db" {
+  name     = var.db_name
+  instance = google_sql_database_instance.dify_postgres.name
+}
+
+# Database User
+resource "google_sql_user" "dify_user" {
+  name     = var.db_user
+  instance = google_sql_database_instance.dify_postgres.name
+  password = var.db_password != "" ? var.db_password : random_password.db_password[0].result
+}
+
+# Private Service Connection for Cloud SQL
+resource "google_compute_global_address" "private_ip_address" {
+  name          = "${var.prefix}-private-ip"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.dify_network.id
+}
+
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.dify_network.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
 }

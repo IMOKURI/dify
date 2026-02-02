@@ -28,3 +28,16 @@ domain_name = "dify.example.com"
 
 # Docker Configuration
 docker_compose_version = "v2.24.5"
+
+# Cloud SQL Configuration
+cloudsql_tier              = "db-custom-2-7680" # 2 vCPU, 7.5GB RAM
+cloudsql_disk_size         = 50
+cloudsql_database_version  = "POSTGRES_15"
+cloudsql_backup_enabled    = true
+cloudsql_backup_start_time = "03:00"
+
+# Database Configuration
+db_name     = "dify"
+db_user     = "dify"
+db_password = "" # Leave empty to generate random password
+

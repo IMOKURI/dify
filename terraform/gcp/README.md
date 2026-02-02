@@ -15,6 +15,8 @@
 - **静的IPアドレス**: ロードバランサー用
 - **サービスアカウント**: VM用のIAM権限
 - **インスタンスグループ**: ロードバランサーバックエンド
+- **Cloud SQL PostgreSQL**: マネージドPostgreSQLデータベース
+- **VPCピアリング**: Cloud SQLのプライベート接続
 
 ## 前提条件
 
@@ -29,6 +31,7 @@
    ```bash
    gcloud services enable compute.googleapis.com
    gcloud services enable servicenetworking.googleapis.com
+   gcloud services enable sqladmin.googleapis.com
    ```
 
 ## セットアップ手順
@@ -52,6 +55,12 @@ domain_name = "dify.example.com"
 
 # SSHキーを設定する場合
 ssh_public_key = "ssh-rsa AAAAB3... your-email@example.com"
+
+# Cloud SQL設定
+cloudsql_tier = "db-custom-2-7680"  # 2 vCPU, 7.5GB RAM
+db_name       = "dify"
+db_user       = "dify"
+db_password   = ""  # 空の場合はランダムパスワードを生成
 ```
 
 ### 2. Terraformの初期化
@@ -85,6 +94,15 @@ terraform output
 - `vm_instance_ip`: VMインスタンスのIPアドレス
 - `ssh_command`: VMへのSSH接続コマンド
 - `https_url`: アプリケーションのHTTPS URL
+- `cloudsql_connection_name`: Cloud SQL接続名
+- `cloudsql_private_ip`: Cloud SQLのプライベートIPアドレス
+- `database_name`: データベース名
+- `database_url`: データベース接続URL (sensitive)
+
+データベースパスワードを確認:
+```bash
+terraform output database_password
+```
 
 ## VM へのアクセスとDifyのデプロイ
 
@@ -112,7 +130,24 @@ cd dify/docker
 
 # 環境変数を設定
 cp .env.example .env
-nano .env  # 必要に応じて編集
+
+# Cloud SQLの接続情報を設定
+# Terraformのoutputから取得した値を使用
+DB_USERNAME=dify
+DB_PASSWORD=<terraform output -raw database_password>
+DB_HOST=<terraform output -raw cloudsql_private_ip>
+DB_PORT=5432
+DB_DATABASE=dify
+
+# .envファイルを編集
+nano .env
+
+# 以下の行を更新:
+# DB_USERNAME=dify
+# DB_PASSWORD=<上記で取得したパスワード>
+# DB_HOST=<Cloud SQLのプライベートIP>
+# DB_PORT=5432
+# DB_DATABASE=dify
 
 # Docker Composeで起動
 docker-compose up -d
@@ -125,7 +160,6 @@ docker-compose logs -f
 
 ブラウザで以下のURLにアクセス:
 - HTTPSアクセス: `https://<LOAD_BALANCER_IP>` または `https://your-domain.com`
-- HTTPアクセス: `http://<LOAD_BALANCER_IP>` (HTTPSにリダイレクトされます)
 
 ## SSL証明書の設定
 
@@ -177,6 +211,36 @@ terraform destroy
 
 ## トラブルシューティング
 
+### Cloud SQLへの接続確認
+
+```bash
+# VMからCloud SQLに接続テスト
+gcloud compute ssh dify-vm --zone asia-northeast1-a
+
+# PostgreSQLクライアントをインストール
+sudo apt-get update
+sudo apt-get install -y postgresql-client
+
+# Cloud SQLに接続
+psql "postgresql://dify:<password>@<cloudsql-private-ip>:5432/dify"
+```
+
+### Cloud SQLの状態確認
+
+```bash
+# インスタンスの一覧
+gcloud sql instances list
+
+# インスタンスの詳細
+gcloud sql instances describe dify-postgres
+
+# データベースの一覧
+gcloud sql databases list --instance=dify-postgres
+
+# ユーザーの一覧
+gcloud sql users list --instance=dify-postgres
+```
+
 ### ヘルスチェックが失敗する
 
 ```bash
@@ -219,6 +283,24 @@ gcloud compute firewall-rules list --filter="network:dify-network"
 
 ```hcl
 machine_type = "n1-standard-4"  # 4 vCPUs, 15GB RAM
+```
+
+### Cloud SQLのスペック変更
+
+より高性能なデータベースが必要な場合:
+
+```hcl
+cloudsql_tier      = "db-custom-4-15360"  # 4 vCPU, 15GB RAM
+cloudsql_disk_size = 100  # 100GB
+```
+
+### 高可用性構成
+
+本番環境ではREGIONAL構成を推奨:
+
+```hcl
+# main.tf の google_sql_database_instance リソースで
+availability_type = "REGIONAL"  # ZONALからREGIONALに変更
 ```
 
 ### ディスクサイズの増加
