@@ -268,11 +268,15 @@ resource "google_sql_database_instance" "dify_postgres" {
     backup_configuration {
       enabled                        = var.cloudsql_backup_enabled
       start_time                     = var.cloudsql_backup_start_time
-      point_in_time_recovery_enabled = true
-      transaction_log_retention_days = 7
-      backup_retention_settings {
-        retained_backups = 7
-        retention_unit   = "COUNT"
+      point_in_time_recovery_enabled = var.cloudsql_backup_enabled
+      transaction_log_retention_days = var.cloudsql_backup_enabled ? 7 : null
+      
+      dynamic "backup_retention_settings" {
+        for_each = var.cloudsql_backup_enabled ? [1] : []
+        content {
+          retained_backups = 7
+          retention_unit   = "COUNT"
+        }
       }
     }
 
