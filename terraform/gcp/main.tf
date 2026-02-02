@@ -156,11 +156,6 @@ resource "google_sql_database_instance" "postgres_vector" {
       ipv4_enabled    = false
       private_network = google_compute_network.dify_vpc.id
     }
-
-    database_flags {
-      name  = "cloudsql.enable_pgvector"
-      value = "on"
-    }
   }
 
   deletion_protection = var.enable_deletion_protection
