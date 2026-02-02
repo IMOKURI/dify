@@ -279,7 +279,7 @@ resource "google_sql_database_instance" "dify_postgres" {
     ip_configuration {
       ipv4_enabled    = false
       private_network = google_compute_network.dify_network.id
-      require_ssl     = false
+      ssl_mode        = "ALLOW_UNENCRYPTED_AND_ENCRYPTED"
     }
 
     database_flags {
