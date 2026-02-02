@@ -1,0 +1,30 @@
+# GCP Project Configuration
+project_id = "your-gcp-project-id"
+region     = "asia-northeast1"
+zone       = "asia-northeast1-a"
+
+# Resource Naming
+prefix = "dify"
+
+# Network Configuration
+subnet_cidr = "10.0.1.0/24"
+
+# VM Configuration
+machine_type  = "n1-standard-2"  # 2 vCPUs, 7.5GB RAM
+disk_size_gb  = 50
+
+# SSH Configuration
+ssh_user           = "ubuntu"
+ssh_public_key     = "" # Your SSH public key (optional)
+ssh_source_ranges  = ["0.0.0.0/0"] # Restrict this in production!
+
+# SSL Configuration
+# Option 1: Use a domain name for Google-managed SSL certificate
+domain_name = "dify.example.com"
+
+# Option 2: Use self-signed certificate (if domain_name is empty)
+# ssl_certificate = file("path/to/certificate.pem")
+# ssl_private_key = file("path/to/private-key.pem")
+
+# Docker Configuration
+docker_compose_version = "v2.24.5"
