@@ -314,6 +314,12 @@ resource "google_sql_database" "dify_db" {
   instance = google_sql_database_instance.dify_postgres.name
 }
 
+# Plugin Database
+resource "google_sql_database" "dify_plugin_db" {
+  name     = "${var.db_name}_plugin"
+  instance = google_sql_database_instance.dify_postgres.name
+}
+
 # Database User
 resource "google_sql_user" "dify_user" {
   name     = var.db_user
