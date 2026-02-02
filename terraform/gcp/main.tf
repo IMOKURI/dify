@@ -140,6 +140,72 @@ resource "google_project_iam_member" "dify_sa_metric_writer" {
   member  = "serviceAccount:${google_service_account.dify_sa.email}"
 }
 
+resource "google_project_iam_member" "dify_sa_storage_admin" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.dify_sa.email}"
+}
+
+# Service Account Key for GCS access (optional, only if needed outside GCE)
+resource "google_service_account_key" "dify_sa_key" {
+  count              = var.create_service_account_key ? 1 : 0
+  service_account_id = google_service_account.dify_sa.name
+}
+
+# =============================================================================
+# Google Cloud Storage Configuration
+# =============================================================================
+
+# GCS Bucket for file storage
+resource "google_storage_bucket" "dify_storage" {
+  name          = var.gcs_bucket_name != "" ? var.gcs_bucket_name : "${var.project_id}-${var.prefix}-storage"
+  location      = var.gcs_location
+  force_destroy = var.gcs_force_destroy
+  storage_class = var.gcs_storage_class
+
+  uniform_bucket_level_access = true
+
+  versioning {
+    enabled = var.gcs_versioning_enabled
+  }
+
+  dynamic "lifecycle_rule" {
+    for_each = var.gcs_lifecycle_rules
+    content {
+      action {
+        type          = lifecycle_rule.value.action.type
+        storage_class = lookup(lifecycle_rule.value.action, "storage_class", null)
+      }
+
+      condition {
+        age                   = lookup(lifecycle_rule.value.condition, "age", null)
+        created_before        = lookup(lifecycle_rule.value.condition, "created_before", null)
+        with_state            = lookup(lifecycle_rule.value.condition, "with_state", null)
+        matches_storage_class = lookup(lifecycle_rule.value.condition, "matches_storage_class", null)
+        num_newer_versions    = lookup(lifecycle_rule.value.condition, "num_newer_versions", null)
+      }
+    }
+  }
+
+  dynamic "cors" {
+    for_each = var.gcs_cors_enabled ? [1] : []
+    content {
+      origin          = var.gcs_cors_origins
+      method          = var.gcs_cors_methods
+      response_header = var.gcs_cors_response_headers
+      max_age_seconds = var.gcs_cors_max_age_seconds
+    }
+  }
+
+  labels = merge(
+    {
+      environment = var.prefix
+      managed_by  = "terraform"
+    },
+    var.gcs_labels
+  )
+}
+
 # Instance Group for Load Balancer
 resource "google_compute_instance_group" "dify_ig" {
   name        = "${var.prefix}-ig"

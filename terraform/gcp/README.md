@@ -24,6 +24,13 @@
 - **パフォーマンス最適化**: ベクトル演算に最適化された設定
 - **リードレプリカ**: 読み取りスケーリング用（オプション）
 
+### Google Cloud Storage
+- **GCSバケット**: ファイルストレージ用のバケット
+- **バージョニング**: オブジェクトのバージョン管理（オプション）
+- **ライフサイクルルール**: コスト最適化のための自動アーカイブ・削除
+- **CORS設定**: クロスオリジンリクエスト対応
+- **IAM権限**: サービスアカウントへのStorage Object Admin権限付与
+
 ## 前提条件
 
 1. **Google Cloud SDK**: `gcloud` コマンドがインストール済み
@@ -123,6 +130,98 @@ psql -h 127.0.0.1 -U $(terraform output -raw pgvector_database_user) \
   -d $(terraform output -raw pgvector_database_name) \
   -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
+
+### Google Cloud Storageの設定
+
+GCSバケットは自動的に作成され、Difyのファイルストレージとして使用できます:
+
+```hcl
+# terraform.tfvars でカスタマイズ（オプション）
+
+# バケット名（空の場合は自動生成）
+gcs_bucket_name = ""
+
+# ストレージクラス
+gcs_storage_class = "STANDARD"  # STANDARD, NEARLINE, COLDLINE, ARCHIVE
+
+# バージョニングを有効化
+gcs_versioning_enabled = true
+
+# ライフサイクルルールの設定例
+gcs_lifecycle_rules = [
+  {
+    action = {
+      type = "SetStorageClass"
+      storage_class = "NEARLINE"
+    }
+    condition = {
+      age = 30
+      matches_storage_class = ["STANDARD"]
+    }
+  },
+  {
+    action = {
+      type = "Delete"
+    }
+    condition = {
+      age = 365
+    }
+  }
+]
+
+# CORS設定
+gcs_cors_enabled = true
+gcs_cors_origins = ["*"]  # 本番環境では特定のドメインに制限を推奨
+```
+
+デプロイ後、バケット情報を確認:
+
+```bash
+# バケット名を取得
+terraform output gcs_bucket_name
+
+# バケットURLを取得
+terraform output gcs_bucket_url
+
+# サービスアカウントのメールアドレス
+terraform output service_account_email
+
+# サービスアカウントキー（Base64エンコード済み、create_service_account_key=trueの場合のみ）
+terraform output -raw google_storage_service_account_json_base64
+```
+
+Difyの`.env`ファイルでGCSを使用するには:
+
+**オプション1: VM上で実行する場合（推奨）**
+
+```bash
+# STORAGE_TYPEをgoogle_storageに設定
+STORAGE_TYPE=google_storage
+
+# バケット名を設定
+GOOGLE_STORAGE_BUCKET_NAME=$(terraform output -raw gcs_bucket_name)
+
+# サービスアカウントの認証情報は不要
+# Google Compute EngineのVMが自動的にサービスアカウント認証を使用
+```
+
+**オプション2: VM外部から使用する場合**
+
+```hcl
+# terraform.tfvarsで有効化
+create_service_account_key = true
+```
+
+再度`terraform apply`を実行してキーを生成した後:
+
+```bash
+# .envファイルに追加
+STORAGE_TYPE=google_storage
+GOOGLE_STORAGE_BUCKET_NAME=$(terraform output -raw gcs_bucket_name)
+GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64=$(terraform output -raw google_storage_service_account_json_base64)
+```
+
+> **セキュリティ上の注意**: サービスアカウントキーを作成すると、そのキーが漏洩した場合にセキュリティリスクとなります。可能な限り、VM上でデフォルトのサービスアカウント認証を使用することを推奨します。
 
 ### SSL証明書の設定
 

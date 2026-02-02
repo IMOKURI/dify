@@ -41,6 +41,11 @@ db_name     = "dify"
 db_user     = "dify"
 db_password = "" # Leave empty to generate random password
 
+# Service Account Key Configuration
+# Set to true if you need to access GCS from outside GCE (not recommended for production)
+# For VM-based deployments, leave as false - the VM will use its service account automatically
+create_service_account_key = false
+
 # =============================================================================
 # pgvector Configuration (Optional)
 # =============================================================================
@@ -93,3 +98,57 @@ enable_pgvector = false
 # pgvector_enable_read_replica = false
 # pgvector_replica_region = ""  # Leave empty to use same region
 # pgvector_replica_tier = ""  # Leave empty to use same tier as primary
+
+# =============================================================================
+# Google Cloud Storage Configuration
+# =============================================================================
+
+# GCS Bucket name (leave empty to auto-generate based on project_id and prefix)
+# gcs_bucket_name = ""
+
+# Bucket location (regional or multi-regional)
+# gcs_location = "ASIA-NORTHEAST1"
+
+# Storage class: STANDARD, NEARLINE, COLDLINE, ARCHIVE
+# gcs_storage_class = "STANDARD"
+
+# Enable versioning for bucket objects
+# gcs_versioning_enabled = false
+
+# Allow bucket deletion even if it contains objects (NOT recommended for production)
+# gcs_force_destroy = false
+
+# CORS configuration
+# gcs_cors_enabled = true
+# gcs_cors_origins = ["*"]
+# gcs_cors_methods = ["GET", "HEAD", "PUT", "POST", "DELETE"]
+# gcs_cors_response_headers = ["*"]
+# gcs_cors_max_age_seconds = 3600
+
+# Lifecycle rules example
+# gcs_lifecycle_rules = [
+#   {
+#     action = {
+#       type = "SetStorageClass"
+#       storage_class = "NEARLINE"
+#     }
+#     condition = {
+#       age = 30
+#       matches_storage_class = ["STANDARD"]
+#     }
+#   },
+#   {
+#     action = {
+#       type = "Delete"
+#     }
+#     condition = {
+#       age = 365
+#     }
+#   }
+# ]
+
+# Custom labels
+# gcs_labels = {
+#   team = "platform"
+#   cost_center = "engineering"
+# }

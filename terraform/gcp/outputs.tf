@@ -132,3 +132,33 @@ output "pgvector_replica_private_ip" {
   description = "Private IP address of the pgvector read replica"
   value       = var.enable_pgvector && var.pgvector_enable_read_replica ? google_sql_database_instance.dify_pgvector_replica[0].private_ip_address : null
 }
+
+# =============================================================================
+# Google Cloud Storage Outputs
+# =============================================================================
+
+output "gcs_bucket_name" {
+  description = "Name of the GCS bucket"
+  value       = google_storage_bucket.dify_storage.name
+}
+
+output "gcs_bucket_url" {
+  description = "URL of the GCS bucket"
+  value       = google_storage_bucket.dify_storage.url
+}
+
+output "gcs_bucket_self_link" {
+  description = "Self link of the GCS bucket"
+  value       = google_storage_bucket.dify_storage.self_link
+}
+
+output "service_account_email" {
+  description = "Email of the Dify service account"
+  value       = google_service_account.dify_sa.email
+}
+
+output "google_storage_service_account_json_base64" {
+  description = "Base64-encoded service account JSON key for Google Storage access (only if create_service_account_key is true)"
+  value       = var.create_service_account_key ? google_service_account_key.dify_sa_key[0].private_key : "Not created - VM uses default service account"
+  sensitive   = true
+}
