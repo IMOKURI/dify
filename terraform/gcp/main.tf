@@ -166,7 +166,7 @@ resource "random_password" "pgvector_db_password" {
 
 # Random password for Redis AUTH (if enabled and not provided)
 resource "random_password" "redis_auth_string" {
-  count   = var.enable_redis && var.redis_auth_enabled ? 1 : 0
+  count   = var.redis_auth_enabled ? 1 : 0
   length  = 32
   special = false # Redis AUTH string should not contain special characters
 }
@@ -443,7 +443,7 @@ resource "google_storage_bucket" "dify_storage" {
 
 # Reserved IP range for Redis (if specified)
 resource "google_compute_global_address" "redis_ip_range" {
-  count         = var.enable_redis && var.redis_reserved_ip_range != "" ? 1 : 0
+  count         = var.redis_reserved_ip_range != "" ? 1 : 0
   name          = "${var.prefix}-redis-ip-range"
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
@@ -454,7 +454,6 @@ resource "google_compute_global_address" "redis_ip_range" {
 
 # Redis Memorystore Instance
 resource "google_redis_instance" "dify_redis" {
-  count                   = var.enable_redis ? 1 : 0
   name                    = "${var.prefix}-redis"
   tier                    = var.redis_tier
   memory_size_gb          = var.redis_memory_size_gb
@@ -578,8 +577,8 @@ resource "google_compute_instance" "dify_vm" {
       pgvector_database_name                     = var.pgvector_db_name
       gcs_bucket_name                            = google_storage_bucket.dify_storage.name
       google_storage_service_account_json_base64 = var.create_service_account_key ? google_service_account_key.dify_sa_key[0].private_key : ""
-      redis_host                                 = var.enable_redis ? google_redis_instance.dify_redis[0].host : "redis"
-      redis_auth_string                          = var.enable_redis && var.redis_auth_enabled ? google_redis_instance.dify_redis[0].auth_string : ""
+      redis_host                                 = google_redis_instance.dify_redis.host
+      redis_auth_string                          = var.redis_auth_enabled ? google_redis_instance.dify_redis.auth_string : ""
     })
     destination = "/tmp/.env"
 

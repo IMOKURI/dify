@@ -381,12 +381,6 @@ variable "gcs_labels" {
 # Redis Memorystore Configuration
 # =============================================================================
 
-variable "enable_redis" {
-  description = "Enable Redis Memorystore instance"
-  type        = bool
-  default     = true
-}
-
 variable "redis_tier" {
   description = "Redis service tier (BASIC for standalone, STANDARD_HA for high availability)"
   type        = string
