@@ -159,7 +159,7 @@ resource "random_password" "db_password" {
 
 # Random password for pgvector Cloud SQL (if not provided)
 resource "random_password" "pgvector_db_password" {
-  count   = var.enable_pgvector && var.pgvector_db_password == "" ? 1 : 0
+  count   = var.pgvector_db_password == "" ? 1 : 0
   length  = 32
   special = true
 }
@@ -257,7 +257,6 @@ resource "google_sql_user" "dify_user" {
 
 # Cloud SQL PostgreSQL Instance with pgvector extension
 resource "google_sql_database_instance" "dify_pgvector" {
-  count            = var.enable_pgvector ? 1 : 0
   name             = "${var.prefix}-pgvector"
   database_version = var.pgvector_database_version
   region           = var.region
@@ -335,24 +334,22 @@ resource "google_sql_database_instance" "dify_pgvector" {
 
 # Database for vector storage
 resource "google_sql_database" "pgvector_db" {
-  count    = var.enable_pgvector ? 1 : 0
   name     = var.pgvector_db_name
-  instance = google_sql_database_instance.dify_pgvector[0].name
+  instance = google_sql_database_instance.dify_pgvector.name
 }
 
 # Database User for pgvector
 resource "google_sql_user" "pgvector_user" {
-  count    = var.enable_pgvector ? 1 : 0
   name     = var.pgvector_db_user
-  instance = google_sql_database_instance.dify_pgvector[0].name
+  instance = google_sql_database_instance.dify_pgvector.name
   password = var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result
 }
 
 # Optional: Create a read replica for high availability and read scaling
 resource "google_sql_database_instance" "dify_pgvector_replica" {
-  count                = var.enable_pgvector && var.pgvector_enable_read_replica ? 1 : 0
+  count                = var.pgvector_enable_read_replica ? 1 : 0
   name                 = "${var.prefix}-pgvector-replica"
-  master_instance_name = google_sql_database_instance.dify_pgvector[0].name
+  master_instance_name = google_sql_database_instance.dify_pgvector.name
   region               = var.pgvector_replica_region != "" ? var.pgvector_replica_region : var.region
   database_version     = var.pgvector_database_version
 
@@ -575,10 +572,10 @@ resource "google_compute_instance" "dify_vm" {
       database_user                              = var.db_user
       database_password                          = var.db_password != "" ? var.db_password : random_password.db_password[0].result
       database_name                              = var.db_name
-      pgvector_private_ip                        = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].private_ip_address : "pgvector"
-      pgvector_database_user                     = var.enable_pgvector ? var.pgvector_db_user : "postgres"
-      pgvector_database_password                 = var.enable_pgvector ? (var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result) : "difyai123456"
-      pgvector_database_name                     = var.enable_pgvector ? var.pgvector_db_name : "dify"
+      pgvector_private_ip                        = google_sql_database_instance.dify_pgvector.private_ip_address
+      pgvector_database_user                     = var.pgvector_db_user
+      pgvector_database_password                 = var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result
+      pgvector_database_name                     = var.pgvector_db_name
       gcs_bucket_name                            = google_storage_bucket.dify_storage.name
       google_storage_service_account_json_base64 = var.create_service_account_key ? google_service_account_key.dify_sa_key[0].private_key : ""
       redis_host                                 = var.enable_redis ? google_redis_instance.dify_redis[0].host : "redis"

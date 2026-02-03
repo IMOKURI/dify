@@ -115,16 +115,9 @@ docker-compose logs -f
 https://<terraform output load_balancer_ip>
 ```
 
-## オプション: pgvectorを有効化
+## pgvector拡張機能のインストール
 
-ベクトル検索が必要な場合:
-
-```hcl
-# terraform.tfvars に追加
-enable_pgvector = true
-```
-
-その後、`terraform apply` を実行してpgvectorインスタンスを作成します。
+pgvectorは常に専用のCloud SQLインスタンスで有効化されています。
 
 拡張機能のインストール:
 

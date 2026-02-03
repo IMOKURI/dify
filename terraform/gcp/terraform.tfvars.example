@@ -55,14 +55,10 @@ db_password = "" # Leave empty to generate random password
 create_service_account_key = true
 
 # =============================================================================
-# pgvector Configuration (Optional)
+# pgvector Configuration
 # =============================================================================
 
-# Enable separate Cloud SQL instance for pgvector
-# Set to true to create a dedicated PostgreSQL instance with pgvector extension
-enable_pgvector = true
-
-# When enable_pgvector = true, configure the following:
+# pgvector is always enabled with a separate Cloud SQL instance
 
 # pgvector_database_version = "POSTGRES_16"  # pgvector requires PostgreSQL 11+
 

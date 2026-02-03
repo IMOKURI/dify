@@ -106,13 +106,12 @@ terraform output
 
 ## 詳細設定
 
-### pgvectorの有効化
+### pgvector設定
 
-ベクトル類似性検索が必要な場合、専用のCloud SQLインスタンスを作成できます:
+pgvectorは常に専用のCloud SQLインスタンスで有効化されています。ベクトル類似性検索に必要な設定をカスタマイズできます:
 
 ```hcl
 # terraform.tfvars に追加
-enable_pgvector = true
 
 # オプション: カスタム設定
 pgvector_tier = "db-custom-4-16384"  # 4 vCPU, 16GB RAM
@@ -122,7 +121,7 @@ pgvector_db_user = "dify_vector"
 pgvector_db_password = ""  # 空の場合は自動生成
 ```
 
-pgvectorを有効化した後、拡張機能をインストール:
+pgvectorインスタンス作成後、拡張機能をインストール:
 
 ```bash
 # Cloud SQL Proxyを使用
@@ -640,8 +639,7 @@ terraform destroy
 - `db_password`: データベースパスワード
 
 ### pgvector設定
-- `enable_pgvector`: pgvectorインスタンスの有効化（デフォルト: false）
-- `pgvector_tier`: pgvectorのマシンタイプ
+- `pgvector_tier`: pgvectorのマシンタイプ（デフォルト: db-custom-4-16384）
 - `pgvector_disk_size`: ディスクサイズ（GB）
 - `pgvector_database_version`: PostgreSQLバージョン
 - `pgvector_db_name`: データベース名

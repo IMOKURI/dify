@@ -72,65 +72,65 @@ output "database_url" {
 }
 
 # =============================================================================
-# pgvector Outputs (when enabled)
+# pgvector Outputs
 # =============================================================================
 
 output "pgvector_instance_name" {
   description = "Name of the pgvector Cloud SQL instance"
-  value       = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].name : null
+  value       = google_sql_database_instance.dify_pgvector.name
 }
 
 output "pgvector_connection_name" {
   description = "Connection name for the pgvector Cloud SQL instance"
-  value       = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].connection_name : null
+  value       = google_sql_database_instance.dify_pgvector.connection_name
 }
 
 output "pgvector_private_ip" {
   description = "Private IP address of the pgvector Cloud SQL instance"
-  value       = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].private_ip_address : null
+  value       = google_sql_database_instance.dify_pgvector.private_ip_address
 }
 
 output "pgvector_public_ip" {
   description = "Public IP address of the pgvector Cloud SQL instance (if enabled)"
-  value       = var.enable_pgvector && var.pgvector_enable_public_ip ? google_sql_database_instance.dify_pgvector[0].public_ip_address : null
+  value       = var.pgvector_enable_public_ip ? google_sql_database_instance.dify_pgvector.public_ip_address : null
 }
 
 output "pgvector_database_name" {
   description = "Database name for pgvector"
-  value       = var.enable_pgvector ? google_sql_database.pgvector_db[0].name : null
+  value       = google_sql_database.pgvector_db.name
 }
 
 output "pgvector_database_user" {
   description = "Database user for pgvector"
-  value       = var.enable_pgvector ? google_sql_user.pgvector_user[0].name : null
+  value       = google_sql_user.pgvector_user.name
 }
 
 output "pgvector_database_password" {
   description = "Database password for pgvector"
-  value       = var.enable_pgvector ? google_sql_user.pgvector_user[0].password : null
+  value       = google_sql_user.pgvector_user.password
   sensitive   = true
 }
 
 output "pgvector_database_url" {
   description = "PostgreSQL connection URL for pgvector"
-  value = var.enable_pgvector ? format(
+  value = format(
     "postgresql://%s:%s@%s/%s",
-    google_sql_user.pgvector_user[0].name,
-    google_sql_user.pgvector_user[0].password,
-    google_sql_database_instance.dify_pgvector[0].private_ip_address,
-    google_sql_database.pgvector_db[0].name
-  ) : null
+    google_sql_user.pgvector_user.name,
+    google_sql_user.pgvector_user.password,
+    google_sql_database_instance.dify_pgvector.private_ip_address,
+    google_sql_database.pgvector_db.name
+  )
   sensitive = true
 }
 
 output "pgvector_replica_instance_name" {
   description = "Name of the pgvector read replica instance"
-  value       = var.enable_pgvector && var.pgvector_enable_read_replica ? google_sql_database_instance.dify_pgvector_replica[0].name : null
+  value       = var.pgvector_enable_read_replica ? google_sql_database_instance.dify_pgvector_replica[0].name : null
 }
 
 output "pgvector_replica_private_ip" {
   description = "Private IP address of the pgvector read replica"
-  value       = var.enable_pgvector && var.pgvector_enable_read_replica ? google_sql_database_instance.dify_pgvector_replica[0].private_ip_address : null
+  value       = var.pgvector_enable_read_replica ? google_sql_database_instance.dify_pgvector_replica[0].private_ip_address : null
 }
 
 # =============================================================================

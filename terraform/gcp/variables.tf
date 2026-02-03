@@ -155,12 +155,6 @@ variable "create_service_account_key" {
 # pgvector Configuration
 # =============================================================================
 
-variable "enable_pgvector" {
-  description = "Enable separate pgvector-enabled Cloud SQL instance"
-  type        = bool
-  default     = false
-}
-
 variable "pgvector_database_version" {
   description = "PostgreSQL version for pgvector Cloud SQL instance (must be 11 or higher for vector support)"
   type        = string
