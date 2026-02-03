@@ -34,6 +34,9 @@ domain_name = "dify.example.com"
 # Docker Configuration
 docker_compose_version = "v2.24.5"
 
+# Dify Configuration
+dify_version = "1.11.4"
+
 # Cloud SQL Configuration
 cloudsql_tier              = "db-custom-2-7680" # 2 vCPU, 7.5GB RAM
 cloudsql_disk_size         = 50

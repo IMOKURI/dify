@@ -79,16 +79,21 @@ cat > /opt/dify/README.md << 'EOF'
 
 ## Deploy Dify
 
-1. Clone the Dify repository:
+**Note:** Dify source code has been automatically downloaded and placed in `/opt/dify`.
+
+1. Navigate to the Dify docker directory:
    ```bash
-   cd /opt/dify
-   git clone https://github.com/langgenius/dify.git
-   cd dify/docker
+   cd /opt/dify/docker
    ```
 
 2. Copy and configure environment variables:
    ```bash
-   cp .env.example .env
+   # Use the pre-configured .env.example if available
+   cp /opt/dify/.env.example .env
+   
+   # Or use the default from Dify repository
+   # cp .env.example .env
+   
    # Edit .env file with your configuration
    nano .env
    ```
@@ -109,7 +114,18 @@ cat > /opt/dify/README.md << 'EOF'
 - Stop services: `docker-compose down`
 - View logs: `docker-compose logs -f [service_name]`
 - Restart services: `docker-compose restart`
-- Update Dify: `git pull && docker-compose pull && docker-compose up -d`
+- Update Dify to a new version:
+  ```bash
+  cd /opt/dify
+  # Download new version (replace X.Y.Z with desired version)
+  curl -L https://github.com/langgenius/dify/archive/refs/tags/X.Y.Z.tar.gz -o dify-X.Y.Z.tar.gz
+  tar -xzf dify-X.Y.Z.tar.gz
+  cp -r dify-X.Y.Z/* .
+  rm -rf dify-X.Y.Z dify-X.Y.Z.tar.gz
+  cd docker
+  docker-compose pull
+  docker-compose up -d
+  ```
 
 ## Access
 

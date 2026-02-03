@@ -444,25 +444,25 @@ resource "google_compute_global_address" "redis_ip_range" {
 
 # Redis Memorystore Instance
 resource "google_redis_instance" "dify_redis" {
-  count              = var.enable_redis ? 1 : 0
-  name               = "${var.prefix}-redis"
-  tier               = var.redis_tier
-  memory_size_gb     = var.redis_memory_size_gb
-  region             = var.region
-  redis_version      = var.redis_version
-  replica_count      = var.redis_tier == "STANDARD_HA" ? var.redis_replica_count : null
-  auth_enabled       = var.redis_auth_enabled
+  count                   = var.enable_redis ? 1 : 0
+  name                    = "${var.prefix}-redis"
+  tier                    = var.redis_tier
+  memory_size_gb          = var.redis_memory_size_gb
+  region                  = var.region
+  redis_version           = var.redis_version
+  replica_count           = var.redis_tier == "STANDARD_HA" ? var.redis_replica_count : null
+  auth_enabled            = var.redis_auth_enabled
   transit_encryption_mode = var.redis_transit_encryption_mode
-  connect_mode       = var.redis_connect_mode
-  authorized_network = google_compute_network.dify_network.id
-  reserved_ip_range  = var.redis_reserved_ip_range != "" ? var.redis_reserved_ip_range : null
+  connect_mode            = var.redis_connect_mode
+  authorized_network      = google_compute_network.dify_network.id
+  reserved_ip_range       = var.redis_reserved_ip_range != "" ? var.redis_reserved_ip_range : null
 
   # Persistence configuration (only for STANDARD_HA tier)
   dynamic "persistence_config" {
     for_each = var.redis_tier == "STANDARD_HA" && var.redis_persistence_mode == "RDB" ? [1] : []
     content {
-      persistence_mode    = "RDB"
-      rdb_snapshot_period = var.redis_rdb_snapshot_period
+      persistence_mode        = "RDB"
+      rdb_snapshot_period     = var.redis_rdb_snapshot_period
       rdb_snapshot_start_time = var.redis_rdb_snapshot_start_time != "" ? var.redis_rdb_snapshot_start_time : null
     }
   }
@@ -484,10 +484,10 @@ resource "google_redis_instance" "dify_redis" {
   redis_configs = {
     # Timeout for idle connections (in seconds)
     "timeout" = "300"
-    
+
     # Maximum number of connected clients
     "maxmemory-policy" = "allkeys-lru"
-    
+
     # Notify keyspace events
     "notify-keyspace-events" = ""
   }
@@ -557,19 +557,19 @@ resource "google_compute_instance" "dify_vm" {
 
   # Deploy .env.example file to VM with Cloud SQL configuration
   provisioner "file" {
-    content     = templatefile("${path.root}/.env.example", {
-      db_host                                      = google_sql_database_instance.dify_postgres.private_ip_address
-      database_user                                = var.db_user
-      database_password                            = var.db_password != "" ? var.db_password : random_password.db_password[0].result
-      database_name                                = var.db_name
-      pgvector_private_ip                          = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].private_ip_address : "pgvector"
-      pgvector_database_user                       = var.enable_pgvector ? var.pgvector_db_user : "postgres"
-      pgvector_database_password                   = var.enable_pgvector ? (var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result) : "difyai123456"
-      pgvector_database_name                       = var.enable_pgvector ? var.pgvector_db_name : "dify"
-      gcs_bucket_name                              = google_storage_bucket.dify_storage.name
-      google_storage_service_account_json_base64   = var.create_service_account_key ? base64encode(google_service_account_key.dify_sa_key[0].private_key) : ""
-      redis_host                                   = var.enable_redis ? google_redis_instance.dify_redis[0].host : "redis"
-      redis_auth_string                            = var.enable_redis && var.redis_auth_enabled ? google_redis_instance.dify_redis[0].auth_string : ""
+    content = templatefile("${path.root}/.env.example", {
+      db_host                                    = google_sql_database_instance.dify_postgres.private_ip_address
+      database_user                              = var.db_user
+      database_password                          = var.db_password != "" ? var.db_password : random_password.db_password[0].result
+      database_name                              = var.db_name
+      pgvector_private_ip                        = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].private_ip_address : "pgvector"
+      pgvector_database_user                     = var.enable_pgvector ? var.pgvector_db_user : "postgres"
+      pgvector_database_password                 = var.enable_pgvector ? (var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result) : "difyai123456"
+      pgvector_database_name                     = var.enable_pgvector ? var.pgvector_db_name : "dify"
+      gcs_bucket_name                            = google_storage_bucket.dify_storage.name
+      google_storage_service_account_json_base64 = var.create_service_account_key ? base64encode(google_service_account_key.dify_sa_key[0].private_key) : ""
+      redis_host                                 = var.enable_redis ? google_redis_instance.dify_redis[0].host : "redis"
+      redis_auth_string                          = var.enable_redis && var.redis_auth_enabled ? google_redis_instance.dify_redis[0].auth_string : ""
     })
     destination = "/tmp/.env.example"
 
@@ -586,6 +586,25 @@ resource "google_compute_instance" "dify_vm" {
       "sudo mkdir -p /opt/dify",
       "sudo mv /tmp/.env.example /opt/dify/.env.example",
       "sudo chown -R ubuntu:ubuntu /opt/dify"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = var.ssh_user
+      private_key = local.ssh_private_key_content != "" ? local.ssh_private_key_content : null
+      host        = self.network_interface[0].access_config[0].nat_ip
+    }
+  }
+
+  # Download and extract Dify source code
+  provisioner "remote-exec" {
+    inline = [
+      "cd /tmp",
+      "curl -L https://github.com/langgenius/dify/archive/refs/tags/${var.dify_version}.tar.gz -o dify-${var.dify_version}.tar.gz",
+      "tar -xzf dify-${var.dify_version}.tar.gz",
+      "sudo cp -r dify-${var.dify_version}/* /opt/dify/",
+      "sudo chown -R ubuntu:ubuntu /opt/dify",
+      "rm -rf dify-${var.dify_version} dify-${var.dify_version}.tar.gz"
     ]
 
     connection {

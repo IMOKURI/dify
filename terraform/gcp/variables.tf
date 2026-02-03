@@ -90,6 +90,12 @@ variable "docker_compose_version" {
   default     = "v2.24.5"
 }
 
+variable "dify_version" {
+  description = "Dify version to download and deploy"
+  type        = string
+  default     = "1.11.4"
+}
+
 # Cloud SQL Variables
 variable "cloudsql_tier" {
   description = "Cloud SQL instance tier"

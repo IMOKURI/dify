@@ -259,6 +259,14 @@ ssl_private_key = file("private-key.pem")
 
 ## Difyのデプロイ
 
+Terraform適用時に、Difyのソースコード（指定されたバージョン）が自動的に `/opt/dify` にダウンロード・配置されます。
+
+デフォルトのバージョンは `1.11.4` ですが、`terraform.tfvars` で変更できます:
+
+```hcl
+dify_version = "1.11.4"  # 任意のバージョンタグを指定
+```
+
 ### VMにSSH接続
 
 ```bash
@@ -271,15 +279,16 @@ gcloud compute ssh dify-vm --zone asia-northeast1-a --project your-project-id
 
 ### Difyのセットアップ
 
-**Note:** Terraform適用時にSSH秘密鍵を設定した場合、`.env.example`ファイルは自動的に`/opt/dify/`に配置されます。
+**Note:** Terraform適用時に以下が自動的に実行されます:
+- Difyのソースコード（指定バージョン）のダウンロードと配置
+- SSH秘密鍵を設定した場合、`.env.example`ファイルが `/opt/dify/` に配置
 
 ```bash
 # 作業ディレクトリに移動
 cd /opt/dify
 
-# Difyリポジトリをクローン
-git clone https://github.com/langgenius/dify.git
-cd dify/docker
+# Difyのdockerディレクトリに移動
+cd docker
 
 # 環境変数を設定
 # .env.exampleが既に配置されている場合:

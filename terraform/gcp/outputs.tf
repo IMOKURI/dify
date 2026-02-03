@@ -220,7 +220,7 @@ output "redis_connection_url" {
       google_redis_instance.dify_redis[0].auth_string,
       google_redis_instance.dify_redis[0].host,
       google_redis_instance.dify_redis[0].port
-    ) : format(
+      ) : format(
       "redis://%s:%d",
       google_redis_instance.dify_redis[0].host,
       google_redis_instance.dify_redis[0].port
