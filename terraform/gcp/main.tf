@@ -520,22 +520,21 @@ resource "google_redis_instance" "dify_redis" {
 }
 
 # =============================================================================
-# Compute Instance
+# Compute Instance Template for Auto Scaling
 # =============================================================================
 
-# Compute Instance with Docker
-resource "google_compute_instance" "dify_vm" {
-  name         = "${var.prefix}-vm"
+# Instance Template with Docker
+resource "google_compute_instance_template" "dify_template" {
+  name_prefix  = "${var.prefix}-template-"
   machine_type = var.machine_type
-  zone         = var.zone
   tags         = ["dify-instance"]
 
-  boot_disk {
-    initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-2204-lts"
-      size  = var.disk_size_gb
-      type  = "pd-standard"
-    }
+  disk {
+    source_image = "ubuntu-os-cloud/ubuntu-2204-lts"
+    auto_delete  = true
+    boot         = true
+    disk_size_gb = var.disk_size_gb
+    disk_type    = "pd-standard"
   }
 
   network_interface {
@@ -549,24 +548,8 @@ resource "google_compute_instance" "dify_vm" {
 
   metadata = {
     ssh-keys = local.ssh_public_key_content != "" ? "${var.ssh_user}:${local.ssh_public_key_content}" : ""
-  }
-
-  metadata_startup_script = templatefile("${path.module}/startup-script.sh", {
-    docker_compose_version = var.docker_compose_version
-  })
-
-  service_account {
-    email  = google_service_account.dify_sa.email
-    scopes = ["cloud-platform"]
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  # Deploy .env.example file to VM with Cloud SQL configuration
-  provisioner "file" {
-    content = templatefile("${path.root}/.env.example", {
+    startup-script = templatefile("${path.module}/startup-script.sh", {
+      docker_compose_version                     = var.docker_compose_version
       db_host                                    = google_sql_database_instance.dify_postgres.private_ip_address
       database_user                              = var.db_user
       database_password                          = var.db_password != "" ? var.db_password : random_password.db_password[0].result
@@ -579,31 +562,87 @@ resource "google_compute_instance" "dify_vm" {
       google_storage_service_account_json_base64 = var.create_service_account_key ? google_service_account_key.dify_sa_key[0].private_key : ""
       redis_host                                 = google_redis_instance.dify_redis.host
       redis_auth_string                          = var.redis_auth_enabled ? google_redis_instance.dify_redis.auth_string : ""
+      dify_version                               = var.dify_version
     })
-    destination = "/tmp/.env"
-
-    connection {
-      type        = "ssh"
-      user        = var.ssh_user
-      private_key = local.ssh_private_key_content != "" ? local.ssh_private_key_content : null
-      host        = self.network_interface[0].access_config[0].nat_ip
-    }
   }
 
-  # Download and extract Dify source code
-  provisioner "remote-exec" {
-    inline = [
-      "curl -L https://github.com/langgenius/dify/archive/refs/tags/${var.dify_version}.tar.gz -o /tmp/dify-${var.dify_version}.tar.gz",
-      "sudo tar -xzf /tmp/dify-${var.dify_version}.tar.gz -C /opt/",
-      "sudo mv /tmp/.env /opt/dify-${var.dify_version}/docker/.env",
-      "sudo chown -R ubuntu:ubuntu /opt/dify-${var.dify_version}"
-    ]
+  service_account {
+    email  = google_service_account.dify_sa.email
+    scopes = ["cloud-platform"]
+  }
 
-    connection {
-      type        = "ssh"
-      user        = var.ssh_user
-      private_key = local.ssh_private_key_content != "" ? local.ssh_private_key_content : null
-      host        = self.network_interface[0].access_config[0].nat_ip
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Managed Instance Group for Auto Scaling
+resource "google_compute_region_instance_group_manager" "dify_mig" {
+  name               = "${var.prefix}-mig"
+  base_instance_name = "${var.prefix}-instance"
+  region             = var.region
+
+  version {
+    instance_template = google_compute_instance_template.dify_template.id
+  }
+
+  target_size = var.autoscaling_enabled ? null : var.autoscaling_min_replicas
+
+  named_port {
+    name = "http"
+    port = 1080
+  }
+
+  auto_healing_policies {
+    health_check      = google_compute_health_check.dify_health_check.id
+    initial_delay_sec = 300
+  }
+
+  update_policy {
+    type                           = "PROACTIVE"
+    instance_redistribution_type   = "PROACTIVE"
+    minimal_action                 = "REPLACE"
+    most_disruptive_allowed_action = "REPLACE"
+    max_surge_fixed                = 3
+    max_unavailable_fixed          = 0
+    replacement_method             = "SUBSTITUTE"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Autoscaler for Managed Instance Group
+resource "google_compute_region_autoscaler" "dify_autoscaler" {
+  count  = var.autoscaling_enabled ? 1 : 0
+  name   = "${var.prefix}-autoscaler"
+  region = var.region
+  target = google_compute_region_instance_group_manager.dify_mig.id
+
+  autoscaling_policy {
+    max_replicas    = var.autoscaling_max_replicas
+    min_replicas    = var.autoscaling_min_replicas
+    cooldown_period = var.autoscaling_cooldown_period
+
+    cpu_utilization {
+      target = var.autoscaling_cpu_target
+    }
+
+    dynamic "metric" {
+      for_each = var.autoscaling_custom_metrics
+      content {
+        name   = metric.value.name
+        target = metric.value.target
+        type   = metric.value.type
+      }
+    }
+
+    scale_in_control {
+      max_scaled_in_replicas {
+        fixed = var.autoscaling_scale_in_max_replicas
+      }
+      time_window_sec = var.autoscaling_scale_in_time_window
     }
   }
 }
@@ -611,26 +650,6 @@ resource "google_compute_instance" "dify_vm" {
 # =============================================================================
 # Load Balancer Configuration
 # =============================================================================
-
-# Instance Group for Load Balancer
-resource "google_compute_instance_group" "dify_ig" {
-  name        = "${var.prefix}-ig"
-  description = "Dify instance group"
-  zone        = var.zone
-
-  instances = [
-    google_compute_instance.dify_vm.id,
-  ]
-
-  named_port {
-    name = "http"
-    port = "1080"
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
 
 # Health Check
 resource "google_compute_health_check" "dify_health_check" {
@@ -657,9 +676,10 @@ resource "google_compute_backend_service" "dify_backend" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
 
   backend {
-    group           = google_compute_instance_group.dify_ig.id
+    group           = google_compute_region_instance_group_manager.dify_mig.instance_group
     balancing_mode  = "UTILIZATION"
     capacity_scaler = 1.0
+    max_utilization = 0.8
   }
 }
 

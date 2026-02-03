@@ -488,3 +488,63 @@ variable "redis_labels" {
   type        = map(string)
   default     = {}
 }
+
+# =============================================================================
+# Auto Scaling Configuration
+# =============================================================================
+
+variable "autoscaling_enabled" {
+  description = "Enable auto scaling for VM instances"
+  type        = bool
+  default     = true
+}
+
+variable "autoscaling_min_replicas" {
+  description = "Minimum number of VM instances"
+  type        = number
+  default     = 2
+}
+
+variable "autoscaling_max_replicas" {
+  description = "Maximum number of VM instances"
+  type        = number
+  default     = 10
+}
+
+variable "autoscaling_cpu_target" {
+  description = "Target CPU utilization for autoscaling (0.0-1.0)"
+  type        = number
+  default     = 0.7
+  validation {
+    condition     = var.autoscaling_cpu_target > 0 && var.autoscaling_cpu_target <= 1.0
+    error_message = "CPU target must be between 0 and 1.0."
+  }
+}
+
+variable "autoscaling_cooldown_period" {
+  description = "Cooldown period in seconds between scaling events"
+  type        = number
+  default     = 60
+}
+
+variable "autoscaling_scale_in_max_replicas" {
+  description = "Maximum number of instances to remove in a single scale-in event"
+  type        = number
+  default     = 3
+}
+
+variable "autoscaling_scale_in_time_window" {
+  description = "Time window in seconds for calculating scale-in decisions"
+  type        = number
+  default     = 120
+}
+
+variable "autoscaling_custom_metrics" {
+  description = "Custom metrics for autoscaling"
+  type = list(object({
+    name   = string
+    target = number
+    type   = string # GAUGE, DELTA_PER_SECOND, DELTA_PER_MINUTE
+  }))
+  default = []
+}

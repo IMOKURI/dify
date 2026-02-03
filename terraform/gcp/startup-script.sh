@@ -27,7 +27,43 @@ systemctl start docker
 # Install additional tools
 apt-get install -y git curl wget vim nano htop
 
-# Install Nginx for reverse proxy (optional)
+# Download and extract Dify
+DIFY_VERSION="${dify_version}"
+curl -L "https://github.com/langgenius/dify/archive/refs/tags/$DIFY_VERSION.tar.gz" -o /tmp/dify-$DIFY_VERSION.tar.gz
+mkdir -p /opt
+tar -xzf /tmp/dify-$DIFY_VERSION.tar.gz -C /opt/
+chown -R ubuntu:ubuntu /opt/dify-$DIFY_VERSION
+
+# Create .env file from .env.example
+cd /opt/dify-$DIFY_VERSION/docker
+cp .env.example .env
+
+# Replace configuration values using sed
+# Database Configuration
+sed -i "s|^DB_HOST=.*|DB_HOST=${db_host}|" .env
+sed -i "s|^DB_USER=.*|DB_USER=${database_user}|" .env
+sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${database_password}|" .env
+sed -i "s|^DB_DATABASE=.*|DB_DATABASE=${database_name}|" .env
+
+# pgvector Configuration
+sed -i "s|^PGVECTOR_HOST=.*|PGVECTOR_HOST=${pgvector_private_ip}|" .env
+sed -i "s|^PGVECTOR_USER=.*|PGVECTOR_USER=${pgvector_database_user}|" .env
+sed -i "s|^PGVECTOR_PASSWORD=.*|PGVECTOR_PASSWORD=${pgvector_database_password}|" .env
+sed -i "s|^PGVECTOR_DATABASE=.*|PGVECTOR_DATABASE=${pgvector_database_name}|" .env
+
+# GCS Configuration
+sed -i "s|^STORAGE_TYPE=.*|STORAGE_TYPE=google-storage|" .env
+sed -i "s|^GOOGLE_STORAGE_BUCKET_NAME=.*|GOOGLE_STORAGE_BUCKET_NAME=${gcs_bucket_name}|" .env
+sed -i "s|^GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64=.*|GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64=${google_storage_service_account_json_base64}|" .env
+
+# Redis Configuration
+sed -i "s|^REDIS_HOST=.*|REDIS_HOST=${redis_host}|" .env
+sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=${redis_auth_string}|" .env
+
+# Start Dify with Docker Compose
+sudo -u ubuntu docker-compose up -d
+
+# Install Nginx for reverse proxy
 apt-get install -y nginx
 
 # Configure Nginx as reverse proxy

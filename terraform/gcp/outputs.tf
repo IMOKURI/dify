@@ -3,24 +3,29 @@ output "load_balancer_ip" {
   value       = google_compute_global_address.dify_lb_ip.address
 }
 
-output "vm_instance_name" {
-  description = "VM instance name"
-  value       = google_compute_instance.dify_vm.name
+output "instance_group_manager_name" {
+  description = "Managed Instance Group name"
+  value       = google_compute_region_instance_group_manager.dify_mig.name
 }
 
-output "vm_instance_ip" {
-  description = "VM instance external IP"
-  value       = google_compute_instance.dify_vm.network_interface[0].access_config[0].nat_ip
+output "instance_group_manager_region" {
+  description = "Managed Instance Group region"
+  value       = google_compute_region_instance_group_manager.dify_mig.region
 }
 
-output "vm_zone" {
-  description = "VM instance zone"
-  value       = google_compute_instance.dify_vm.zone
+output "autoscaling_enabled" {
+  description = "Whether autoscaling is enabled"
+  value       = var.autoscaling_enabled
 }
 
-output "ssh_command" {
-  description = "SSH command to connect to the instance"
-  value       = "gcloud compute ssh ${google_compute_instance.dify_vm.name} --zone ${var.zone} --project ${var.project_id}"
+output "autoscaling_min_replicas" {
+  description = "Minimum number of instances"
+  value       = var.autoscaling_min_replicas
+}
+
+output "autoscaling_max_replicas" {
+  description = "Maximum number of instances (if autoscaling enabled)"
+  value       = var.autoscaling_enabled ? var.autoscaling_max_replicas : null
 }
 
 output "https_url" {

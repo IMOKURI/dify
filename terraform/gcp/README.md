@@ -10,12 +10,13 @@
 - **VPCネットワーク**: 独立したネットワーク環境
 - **サブネット**: VPC内のサブネット
 - **ファイアウォールルール**: HTTP/HTTPS、SSH、ヘルスチェック用
-- **Compute Engine VM**: Docker Compose対応のUbuntu VM
+- **Managed Instance Group**: オートスケーリング対応のVMインスタンスグループ
+- **Auto Scaler**: CPU使用率に基づく自動スケーリング
+- **Instance Template**: 標準化されたVM設定テンプレート
 - **グローバルロードバランサー**: HTTPS終端を行うロードバランサー
 - **SSL証明書**: Google管理証明書または自己署名証明書
 - **静的IPアドレス**: ロードバランサー用
 - **サービスアカウント**: VM用のIAM権限
-- **インスタンスグループ**: ロードバランサーバックエンド
 - **Cloud SQL PostgreSQL**: マネージドPostgreSQLデータベース
 - **VPCピアリング**: Cloud SQLのプライベート接続
 
@@ -394,6 +395,121 @@ SELECT id, content, embedding <-> '[0.1, 0.2, ...]'::vector AS distance
 FROM documents
 ORDER BY embedding <-> '[0.1, 0.2, ...]'::vector
 LIMIT 10;
+```
+
+## オートスケーリングの設定
+
+このTerraform構成には、トラフィックに応じて自動的にVMインスタンスを増減するオートスケーリング機能が含まれています。
+
+### 基本設定
+
+```hcl
+# オートスケーリングを有効化
+autoscaling_enabled = true
+
+# 最小インスタンス数（常に実行される数）
+autoscaling_min_replicas = 2
+
+# 最大インスタンス数（ピーク時の上限）
+autoscaling_max_replicas = 10
+
+# CPU使用率の目標値（0.0-1.0）
+# 平均CPU使用率がこの値を超えるとスケールアウト
+autoscaling_cpu_target = 0.7  # 70%
+```
+
+### 高度な設定
+
+```hcl
+# スケーリングイベント間のクールダウン期間（秒）
+autoscaling_cooldown_period = 60
+
+# 一度のスケールイン時に削除する最大インスタンス数
+autoscaling_scale_in_max_replicas = 3
+
+# スケールイン判断に使用する時間枠（秒）
+autoscaling_scale_in_time_window = 120
+```
+
+### カスタムメトリクスによるスケーリング（オプション）
+
+CPU使用率だけでなく、カスタムメトリクスでもスケーリングできます:
+
+```hcl
+autoscaling_custom_metrics = [
+  {
+    name   = "custom.googleapis.com/request_queue_depth"
+    target = 100
+    type   = "GAUGE"
+  },
+  {
+    name   = "custom.googleapis.com/active_connections"
+    target = 1000
+    type   = "GAUGE"
+  }
+]
+```
+
+### オートスケーリングの無効化
+
+固定数のインスタンスで実行する場合:
+
+```hcl
+autoscaling_enabled = false
+autoscaling_min_replicas = 3  # 常に3インスタンスで実行
+```
+
+### インスタンスの確認
+
+```bash
+# Managed Instance Groupの状態を確認
+gcloud compute instance-groups managed describe dify-mig \
+  --region asia-northeast1 \
+  --project your-project-id
+
+# インスタンスの一覧を表示
+gcloud compute instance-groups managed list-instances dify-mig \
+  --region asia-northeast1 \
+  --project your-project-id
+
+# Autoscalerの詳細を確認
+gcloud compute instance-groups managed describe-instance dify-mig \
+  --region asia-northeast1 \
+  --project your-project-id
+```
+
+### スケーリングのベストプラクティス
+
+1. **最小レプリカ数**: 高可用性のため、最低2以上を推奨
+2. **CPU目標値**: 0.6-0.8 (60-80%) が一般的。余裕を持たせることで急激なトラフィック増加に対応
+3. **クールダウン期間**: スケールアウト後の安定化に必要な時間を設定
+4. **スケールイン制限**: 急激なトラフィック減少時に過度なスケールインを防ぐ
+
+### 推奨構成例
+
+#### 小規模〜中規模デプロイ
+```hcl
+autoscaling_enabled = true
+autoscaling_min_replicas = 2
+autoscaling_max_replicas = 5
+autoscaling_cpu_target = 0.7
+machine_type = "n1-standard-2"
+```
+
+#### 大規模デプロイ
+```hcl
+autoscaling_enabled = true
+autoscaling_min_replicas = 3
+autoscaling_max_replicas = 20
+autoscaling_cpu_target = 0.6
+machine_type = "n1-standard-4"
+```
+
+#### 固定サイズ（開発環境）
+```hcl
+autoscaling_enabled = false
+autoscaling_min_replicas = 1
+machine_type = "n1-standard-1"
 ```
 
 ## パフォーマンスチューニング
