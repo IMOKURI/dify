@@ -41,7 +41,7 @@ cp .env.example .env
 # Replace configuration values using sed
 # Database Configuration
 sed -i "s|^DB_HOST=.*|DB_HOST=${db_host}|" .env
-sed -i "s|^DB_USER=.*|DB_USER=${database_user}|" .env
+sed -i "s|^DB_USERNAME=.*|DB_USERNAME=${database_user}|" .env
 sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD='${database_password}'|" .env
 sed -i "s|^DB_DATABASE=.*|DB_DATABASE=${database_name}|" .env
 
