@@ -571,22 +571,7 @@ resource "google_compute_instance" "dify_vm" {
       redis_host                                 = var.enable_redis ? google_redis_instance.dify_redis[0].host : "redis"
       redis_auth_string                          = var.enable_redis && var.redis_auth_enabled ? google_redis_instance.dify_redis[0].auth_string : ""
     })
-    destination = "/tmp/.env.example"
-
-    connection {
-      type        = "ssh"
-      user        = var.ssh_user
-      private_key = local.ssh_private_key_content != "" ? local.ssh_private_key_content : null
-      host        = self.network_interface[0].access_config[0].nat_ip
-    }
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo mkdir -p /opt/dify",
-      "sudo mv /tmp/.env.example /opt/dify/.env.example",
-      "sudo chown -R ubuntu:ubuntu /opt/dify"
-    ]
+    destination = "/tmp/.env"
 
     connection {
       type        = "ssh"
@@ -599,12 +584,10 @@ resource "google_compute_instance" "dify_vm" {
   # Download and extract Dify source code
   provisioner "remote-exec" {
     inline = [
-      "cd /tmp",
-      "curl -L https://github.com/langgenius/dify/archive/refs/tags/${var.dify_version}.tar.gz -o dify-${var.dify_version}.tar.gz",
-      "tar -xzf dify-${var.dify_version}.tar.gz",
-      "sudo cp -r dify-${var.dify_version}/* /opt/dify/",
-      "sudo chown -R ubuntu:ubuntu /opt/dify",
-      "rm -rf dify-${var.dify_version} dify-${var.dify_version}.tar.gz"
+      "curl -L https://github.com/langgenius/dify/archive/refs/tags/${var.dify_version}.tar.gz -o /tmp/dify-${var.dify_version}.tar.gz",
+      "sudo tar -xzf /tmp/dify-${var.dify_version}.tar.gz" -C /opt/,
+      "sudo mv /tmp/.env /opt/dify-${var.dify_version}/docker/.env",
+      "sudo chown -R ubuntu:ubuntu /opt/dify"
     ]
 
     connection {
