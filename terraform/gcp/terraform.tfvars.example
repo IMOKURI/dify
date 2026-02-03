@@ -16,6 +16,7 @@ disk_size_gb  = 50
 # SSH Configuration
 ssh_user           = "ubuntu"
 ssh_public_key     = "" # Your SSH public key (optional)
+ssh_private_key    = "" # Your SSH private key for provisioning (required when deploying .env.example)
 ssh_source_ranges  = ["0.0.0.0/0"] # Restrict this in production!
 
 # SSL Configuration
@@ -152,3 +153,5 @@ enable_pgvector = false
 #   team = "platform"
 #   cost_center = "engineering"
 # }
+
+create_service_account_key = true

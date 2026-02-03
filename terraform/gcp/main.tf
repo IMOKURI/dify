@@ -119,6 +119,45 @@ resource "google_compute_instance" "dify_vm" {
   lifecycle {
     create_before_destroy = true
   }
+
+  # Deploy .env.example file to VM with Cloud SQL configuration
+  provisioner "file" {
+    content     = templatefile("${path.root}/.env.example", {
+      db_host                                      = google_sql_database_instance.dify_postgres.private_ip_address
+      database_user                                = var.db_user
+      database_password                            = var.db_password != "" ? var.db_password : random_password.db_password[0].result
+      database_name                                = var.db_name
+      pgvector_private_ip                          = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].private_ip_address : "pgvector"
+      pgvector_database_user                       = var.enable_pgvector ? var.pgvector_db_user : "postgres"
+      pgvector_database_password                   = var.enable_pgvector ? (var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result) : "difyai123456"
+      pgvector_database_name                       = var.enable_pgvector ? var.pgvector_db_name : "dify"
+      gcs_bucket_name                              = google_storage_bucket.dify_storage.name
+      google_storage_service_account_json_base64   = var.create_service_account_key ? base64encode(google_service_account_key.dify_sa_key[0].private_key) : ""
+    })
+    destination = "/tmp/.env.example"
+
+    connection {
+      type        = "ssh"
+      user        = var.ssh_user
+      private_key = var.ssh_private_key != "" ? var.ssh_private_key : null
+      host        = self.network_interface[0].access_config[0].nat_ip
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo mkdir -p /opt/dify",
+      "sudo mv /tmp/.env.example /opt/dify/.env.example",
+      "sudo chown -R ubuntu:ubuntu /opt/dify"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = var.ssh_user
+      private_key = var.ssh_private_key != "" ? var.ssh_private_key : null
+      host        = self.network_interface[0].access_config[0].nat_ip
+    }
+  }
 }
 
 # Service Account for VM

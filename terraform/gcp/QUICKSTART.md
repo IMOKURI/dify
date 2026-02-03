@@ -84,7 +84,12 @@ git clone https://github.com/langgenius/dify.git
 cd dify/docker
 
 # 環境設定
-cp .env.example .env
+# Note: SSH秘密鍵を設定した場合、.env.exampleは既に /opt/dify/docker/ に配置されています
+if [ -f /opt/dify/.env.example ]; then
+  cp /opt/dify/.env.example .env
+else
+  cp .env.example .env
+fi
 
 # データベース情報を設定（Terraformのoutputから取得した値を使用）
 nano .env

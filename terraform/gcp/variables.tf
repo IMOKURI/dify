@@ -57,6 +57,13 @@ variable "ssh_public_key" {
   default     = ""
 }
 
+variable "ssh_private_key" {
+  description = "SSH private key for instance provisioning (required for file provisioner)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "domain_name" {
   description = "Domain name for SSL certificate (leave empty to use self-signed certificate)"
   type        = string

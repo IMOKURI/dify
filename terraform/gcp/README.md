@@ -73,6 +73,10 @@ domain_name = "dify.example.com"
 # SSHキー（オプション）
 ssh_public_key = "ssh-rsa AAAAB3... your-email@example.com"
 
+# .env.exampleをVMに自動配置する場合は、SSH秘密鍵を設定（オプション）
+# 注: セキュリティ上、秘密鍵をファイルで読み込むことを推奨
+ssh_private_key = file("~/.ssh/id_rsa")
+
 # データベースパスワード（空の場合は自動生成）
 db_password = ""
 ```
@@ -267,6 +271,8 @@ gcloud compute ssh dify-vm --zone asia-northeast1-a --project your-project-id
 
 ### Difyのセットアップ
 
+**Note:** Terraform適用時にSSH秘密鍵を設定した場合、`.env.example`ファイルは自動的に`/opt/dify/`に配置されます。
+
 ```bash
 # 作業ディレクトリに移動
 cd /opt/dify
@@ -276,7 +282,12 @@ git clone https://github.com/langgenius/dify.git
 cd dify/docker
 
 # 環境変数を設定
+# .env.exampleが既に配置されている場合:
+cp /opt/dify/.env.example .env
+
+# または、Difyリポジトリのデフォルト設定を使用:
 cp .env.example .env
+
 nano .env
 
 # 以下の設定を更新:
