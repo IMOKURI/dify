@@ -127,6 +127,19 @@ resource "google_project_iam_member" "dify_sa_storage_admin" {
   member  = "serviceAccount:${google_service_account.dify_sa.email}"
 }
 
+resource "google_project_iam_member" "dify_sa_storage_viewer" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_service_account.dify_sa.email}"
+}
+
+# Grant bucket-level permissions
+resource "google_storage_bucket_iam_member" "dify_storage_admin" {
+  bucket = google_storage_bucket.dify_storage.name
+  role   = "roles/storage.admin"
+  member = "serviceAccount:${google_service_account.dify_sa.email}"
+}
+
 # Service Account Key for GCS access (optional, only if needed outside GCE)
 resource "google_service_account_key" "dify_sa_key" {
   count              = var.create_service_account_key ? 1 : 0
