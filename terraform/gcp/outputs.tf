@@ -162,3 +162,80 @@ output "google_storage_service_account_json_base64" {
   value       = var.create_service_account_key ? google_service_account_key.dify_sa_key[0].private_key : "Not created - VM uses default service account"
   sensitive   = true
 }
+
+# =============================================================================
+# Redis Memorystore Outputs
+# =============================================================================
+
+output "redis_instance_name" {
+  description = "Name of the Redis Memorystore instance"
+  value       = var.enable_redis ? google_redis_instance.dify_redis[0].name : null
+}
+
+output "redis_host" {
+  description = "Host (IP address) of the Redis instance"
+  value       = var.enable_redis ? google_redis_instance.dify_redis[0].host : null
+}
+
+output "redis_port" {
+  description = "Port of the Redis instance"
+  value       = var.enable_redis ? google_redis_instance.dify_redis[0].port : null
+}
+
+output "redis_current_location_id" {
+  description = "The current zone where the Redis instance is located"
+  value       = var.enable_redis ? google_redis_instance.dify_redis[0].current_location_id : null
+}
+
+output "redis_read_endpoint" {
+  description = "Read endpoint for the Redis instance (for read replicas)"
+  value       = var.enable_redis ? google_redis_instance.dify_redis[0].read_endpoint : null
+}
+
+output "redis_read_endpoint_port" {
+  description = "Port for the read endpoint"
+  value       = var.enable_redis ? google_redis_instance.dify_redis[0].read_endpoint_port : null
+}
+
+output "redis_auth_string" {
+  description = "Redis AUTH string (password)"
+  value       = var.enable_redis && var.redis_auth_enabled ? google_redis_instance.dify_redis[0].auth_string : null
+  sensitive   = true
+}
+
+output "redis_connection_string" {
+  description = "Redis connection string (redis://host:port)"
+  value = var.enable_redis ? format(
+    "redis://%s:%d",
+    google_redis_instance.dify_redis[0].host,
+    google_redis_instance.dify_redis[0].port
+  ) : null
+}
+
+output "redis_connection_url" {
+  description = "Redis connection URL with authentication (if enabled)"
+  value = var.enable_redis ? (
+    var.redis_auth_enabled ? format(
+      "redis://:%s@%s:%d",
+      google_redis_instance.dify_redis[0].auth_string,
+      google_redis_instance.dify_redis[0].host,
+      google_redis_instance.dify_redis[0].port
+    ) : format(
+      "redis://%s:%d",
+      google_redis_instance.dify_redis[0].host,
+      google_redis_instance.dify_redis[0].port
+    )
+  ) : null
+  sensitive = true
+}
+
+output "redis_persistence_iam_identity" {
+  description = "Cloud IAM identity for RDB persistence"
+  value       = var.enable_redis ? google_redis_instance.dify_redis[0].persistence_iam_identity : null
+}
+
+output "redis_server_ca_certs" {
+  description = "List of server CA certificates for the instance"
+  value       = var.enable_redis ? google_redis_instance.dify_redis[0].server_ca_certs : null
+  sensitive   = true
+}

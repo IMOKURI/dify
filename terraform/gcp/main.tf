@@ -79,86 +79,28 @@ resource "google_compute_global_address" "dify_lb_ip" {
   name = "${var.prefix}-lb-ip"
 }
 
-# Compute Instance with Docker
-resource "google_compute_instance" "dify_vm" {
-  name         = "${var.prefix}-vm"
-  machine_type = var.machine_type
-  zone         = var.zone
-  tags         = ["dify-instance"]
+# =============================================================================
+# Private Service Connection for Cloud SQL
+# =============================================================================
 
-  boot_disk {
-    initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-2204-lts"
-      size  = var.disk_size_gb
-      type  = "pd-standard"
-    }
-  }
-
-  network_interface {
-    network    = google_compute_network.dify_network.name
-    subnetwork = google_compute_subnetwork.dify_subnet.name
-
-    access_config {
-      # Ephemeral public IP
-    }
-  }
-
-  metadata = {
-    ssh-keys = var.ssh_public_key != "" ? "${var.ssh_user}:${var.ssh_public_key}" : ""
-  }
-
-  metadata_startup_script = templatefile("${path.module}/startup-script.sh", {
-    docker_compose_version = var.docker_compose_version
-  })
-
-  service_account {
-    email  = google_service_account.dify_sa.email
-    scopes = ["cloud-platform"]
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  # Deploy .env.example file to VM with Cloud SQL configuration
-  provisioner "file" {
-    content     = templatefile("${path.root}/.env.example", {
-      db_host                                      = google_sql_database_instance.dify_postgres.private_ip_address
-      database_user                                = var.db_user
-      database_password                            = var.db_password != "" ? var.db_password : random_password.db_password[0].result
-      database_name                                = var.db_name
-      pgvector_private_ip                          = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].private_ip_address : "pgvector"
-      pgvector_database_user                       = var.enable_pgvector ? var.pgvector_db_user : "postgres"
-      pgvector_database_password                   = var.enable_pgvector ? (var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result) : "difyai123456"
-      pgvector_database_name                       = var.enable_pgvector ? var.pgvector_db_name : "dify"
-      gcs_bucket_name                              = google_storage_bucket.dify_storage.name
-      google_storage_service_account_json_base64   = var.create_service_account_key ? base64encode(google_service_account_key.dify_sa_key[0].private_key) : ""
-    })
-    destination = "/tmp/.env.example"
-
-    connection {
-      type        = "ssh"
-      user        = var.ssh_user
-      private_key = var.ssh_private_key != "" ? var.ssh_private_key : null
-      host        = self.network_interface[0].access_config[0].nat_ip
-    }
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "sudo mkdir -p /opt/dify",
-      "sudo mv /tmp/.env.example /opt/dify/.env.example",
-      "sudo chown -R ubuntu:ubuntu /opt/dify"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = var.ssh_user
-      private_key = var.ssh_private_key != "" ? var.ssh_private_key : null
-      host        = self.network_interface[0].access_config[0].nat_ip
-    }
-  }
+# Private Service Connection for Cloud SQL
+resource "google_compute_global_address" "private_ip_address" {
+  name          = "${var.prefix}-private-ip"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.dify_network.id
 }
+
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.dify_network.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
+}
+
+# =============================================================================
+# Service Account Configuration
+# =============================================================================
 
 # Service Account for VM
 resource "google_service_account" "dify_sa" {
@@ -192,162 +134,8 @@ resource "google_service_account_key" "dify_sa_key" {
 }
 
 # =============================================================================
-# Google Cloud Storage Configuration
+# Random Passwords
 # =============================================================================
-
-# GCS Bucket for file storage
-resource "google_storage_bucket" "dify_storage" {
-  name          = var.gcs_bucket_name != "" ? var.gcs_bucket_name : "${var.project_id}-${var.prefix}-storage"
-  location      = var.gcs_location
-  force_destroy = var.gcs_force_destroy
-  storage_class = var.gcs_storage_class
-
-  uniform_bucket_level_access = true
-
-  versioning {
-    enabled = var.gcs_versioning_enabled
-  }
-
-  dynamic "lifecycle_rule" {
-    for_each = var.gcs_lifecycle_rules
-    content {
-      action {
-        type          = lifecycle_rule.value.action.type
-        storage_class = lookup(lifecycle_rule.value.action, "storage_class", null)
-      }
-
-      condition {
-        age                   = lookup(lifecycle_rule.value.condition, "age", null)
-        created_before        = lookup(lifecycle_rule.value.condition, "created_before", null)
-        with_state            = lookup(lifecycle_rule.value.condition, "with_state", null)
-        matches_storage_class = lookup(lifecycle_rule.value.condition, "matches_storage_class", null)
-        num_newer_versions    = lookup(lifecycle_rule.value.condition, "num_newer_versions", null)
-      }
-    }
-  }
-
-  dynamic "cors" {
-    for_each = var.gcs_cors_enabled ? [1] : []
-    content {
-      origin          = var.gcs_cors_origins
-      method          = var.gcs_cors_methods
-      response_header = var.gcs_cors_response_headers
-      max_age_seconds = var.gcs_cors_max_age_seconds
-    }
-  }
-
-  labels = merge(
-    {
-      environment = var.prefix
-      managed_by  = "terraform"
-    },
-    var.gcs_labels
-  )
-}
-
-# Instance Group for Load Balancer
-resource "google_compute_instance_group" "dify_ig" {
-  name        = "${var.prefix}-ig"
-  description = "Dify instance group"
-  zone        = var.zone
-
-  instances = [
-    google_compute_instance.dify_vm.id,
-  ]
-
-  named_port {
-    name = "http"
-    port = "1080"
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Health Check
-resource "google_compute_health_check" "dify_health_check" {
-  name                = "${var.prefix}-health-check"
-  check_interval_sec  = 10
-  timeout_sec         = 5
-  healthy_threshold   = 2
-  unhealthy_threshold = 3
-
-  http_health_check {
-    port         = 1080
-    request_path = "/health"
-  }
-}
-
-# Backend Service
-resource "google_compute_backend_service" "dify_backend" {
-  name                  = "${var.prefix}-backend"
-  protocol              = "HTTP"
-  port_name             = "http"
-  timeout_sec           = 30
-  enable_cdn            = false
-  health_checks         = [google_compute_health_check.dify_health_check.id]
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-
-  backend {
-    group           = google_compute_instance_group.dify_ig.id
-    balancing_mode  = "UTILIZATION"
-    capacity_scaler = 1.0
-  }
-}
-
-# URL Map
-resource "google_compute_url_map" "dify_url_map" {
-  name            = "${var.prefix}-url-map"
-  default_service = google_compute_backend_service.dify_backend.id
-}
-
-# SSL Certificate (Google-managed)
-resource "google_compute_managed_ssl_certificate" "dify_ssl_cert" {
-  count = var.domain_name != "" ? 1 : 0
-  name  = "${var.prefix}-ssl-cert"
-
-  managed {
-    domains = [var.domain_name]
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Self-signed SSL Certificate (for testing without domain)
-resource "google_compute_ssl_certificate" "dify_self_signed" {
-  count       = var.domain_name == "" ? 1 : 0
-  name        = "${var.prefix}-self-signed-cert"
-  private_key = var.ssl_private_key
-  certificate = var.ssl_certificate
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# HTTPS Proxy
-resource "google_compute_target_https_proxy" "dify_https_proxy" {
-  name    = "${var.prefix}-https-proxy"
-  url_map = google_compute_url_map.dify_url_map.id
-  ssl_certificates = var.domain_name != "" ? [
-    google_compute_managed_ssl_certificate.dify_ssl_cert[0].id
-    ] : [
-    google_compute_ssl_certificate.dify_self_signed[0].id
-  ]
-}
-
-# Global Forwarding Rule (HTTPS)
-resource "google_compute_global_forwarding_rule" "dify_https_forwarding_rule" {
-  name                  = "${var.prefix}-https-forwarding-rule"
-  ip_protocol           = "TCP"
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  port_range            = "443"
-  target                = google_compute_target_https_proxy.dify_https_proxy.id
-  ip_address            = google_compute_global_address.dify_lb_ip.id
-}
 
 # Random password for Cloud SQL (if not provided)
 resource "random_password" "db_password" {
@@ -355,6 +143,24 @@ resource "random_password" "db_password" {
   length  = 32
   special = true
 }
+
+# Random password for pgvector Cloud SQL (if not provided)
+resource "random_password" "pgvector_db_password" {
+  count   = var.enable_pgvector && var.pgvector_db_password == "" ? 1 : 0
+  length  = 32
+  special = true
+}
+
+# Random password for Redis AUTH (if enabled and not provided)
+resource "random_password" "redis_auth_string" {
+  count   = var.enable_redis && var.redis_auth_enabled ? 1 : 0
+  length  = 32
+  special = false # Redis AUTH string should not contain special characters
+}
+
+# =============================================================================
+# Cloud SQL Configuration
+# =============================================================================
 
 # Cloud SQL PostgreSQL Instance
 resource "google_sql_database_instance" "dify_postgres" {
@@ -432,31 +238,9 @@ resource "google_sql_user" "dify_user" {
   password = var.db_password != "" ? var.db_password : random_password.db_password[0].result
 }
 
-# Private Service Connection for Cloud SQL
-resource "google_compute_global_address" "private_ip_address" {
-  name          = "${var.prefix}-private-ip"
-  purpose       = "VPC_PEERING"
-  address_type  = "INTERNAL"
-  prefix_length = 16
-  network       = google_compute_network.dify_network.id
-}
-
-resource "google_service_networking_connection" "private_vpc_connection" {
-  network                 = google_compute_network.dify_network.id
-  service                 = "servicenetworking.googleapis.com"
-  reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
-}
-
 # =============================================================================
 # pgvector Cloud SQL Instance (Optional)
 # =============================================================================
-
-# Random password for pgvector Cloud SQL (if not provided)
-resource "random_password" "pgvector_db_password" {
-  count   = var.enable_pgvector && var.pgvector_db_password == "" ? 1 : 0
-  length  = 32
-  special = true
-}
 
 # Cloud SQL PostgreSQL Instance with pgvector extension
 resource "google_sql_database_instance" "dify_pgvector" {
@@ -587,4 +371,336 @@ resource "google_sql_database_instance" "dify_pgvector_replica" {
       query_insights_enabled = var.pgvector_query_insights_enabled
     }
   }
+}
+
+# =============================================================================
+# Google Cloud Storage Configuration
+# =============================================================================
+
+# GCS Bucket for file storage
+resource "google_storage_bucket" "dify_storage" {
+  name          = var.gcs_bucket_name != "" ? var.gcs_bucket_name : "${var.project_id}-${var.prefix}-storage"
+  location      = var.gcs_location
+  force_destroy = var.gcs_force_destroy
+  storage_class = var.gcs_storage_class
+
+  uniform_bucket_level_access = true
+
+  versioning {
+    enabled = var.gcs_versioning_enabled
+  }
+
+  dynamic "lifecycle_rule" {
+    for_each = var.gcs_lifecycle_rules
+    content {
+      action {
+        type          = lifecycle_rule.value.action.type
+        storage_class = lookup(lifecycle_rule.value.action, "storage_class", null)
+      }
+
+      condition {
+        age                   = lookup(lifecycle_rule.value.condition, "age", null)
+        created_before        = lookup(lifecycle_rule.value.condition, "created_before", null)
+        with_state            = lookup(lifecycle_rule.value.condition, "with_state", null)
+        matches_storage_class = lookup(lifecycle_rule.value.condition, "matches_storage_class", null)
+        num_newer_versions    = lookup(lifecycle_rule.value.condition, "num_newer_versions", null)
+      }
+    }
+  }
+
+  dynamic "cors" {
+    for_each = var.gcs_cors_enabled ? [1] : []
+    content {
+      origin          = var.gcs_cors_origins
+      method          = var.gcs_cors_methods
+      response_header = var.gcs_cors_response_headers
+      max_age_seconds = var.gcs_cors_max_age_seconds
+    }
+  }
+
+  labels = merge(
+    {
+      environment = var.prefix
+      managed_by  = "terraform"
+    },
+    var.gcs_labels
+  )
+}
+
+# =============================================================================
+# Redis Memorystore Configuration
+# =============================================================================
+
+# Reserved IP range for Redis (if specified)
+resource "google_compute_global_address" "redis_ip_range" {
+  count         = var.enable_redis && var.redis_reserved_ip_range != "" ? 1 : 0
+  name          = "${var.prefix}-redis-ip-range"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 29 # Redis requires /29
+  network       = google_compute_network.dify_network.id
+  address       = split("/", var.redis_reserved_ip_range)[0]
+}
+
+# Redis Memorystore Instance
+resource "google_redis_instance" "dify_redis" {
+  count              = var.enable_redis ? 1 : 0
+  name               = "${var.prefix}-redis"
+  tier               = var.redis_tier
+  memory_size_gb     = var.redis_memory_size_gb
+  region             = var.region
+  redis_version      = var.redis_version
+  replica_count      = var.redis_tier == "STANDARD_HA" ? var.redis_replica_count : null
+  auth_enabled       = var.redis_auth_enabled
+  transit_encryption_mode = var.redis_transit_encryption_mode
+  connect_mode       = var.redis_connect_mode
+  authorized_network = google_compute_network.dify_network.id
+  reserved_ip_range  = var.redis_reserved_ip_range != "" ? var.redis_reserved_ip_range : null
+
+  # Persistence configuration (only for STANDARD_HA tier)
+  dynamic "persistence_config" {
+    for_each = var.redis_tier == "STANDARD_HA" && var.redis_persistence_mode == "RDB" ? [1] : []
+    content {
+      persistence_mode    = "RDB"
+      rdb_snapshot_period = var.redis_rdb_snapshot_period
+      rdb_snapshot_start_time = var.redis_rdb_snapshot_start_time != "" ? var.redis_rdb_snapshot_start_time : null
+    }
+  }
+
+  # Maintenance policy
+  maintenance_policy {
+    weekly_maintenance_window {
+      day = var.redis_maintenance_window_day
+      start_time {
+        hours   = var.redis_maintenance_window_hour
+        minutes = 0
+        seconds = 0
+        nanos   = 0
+      }
+    }
+  }
+
+  # Redis configuration parameters
+  redis_configs = {
+    # Timeout for idle connections (in seconds)
+    "timeout" = "300"
+    
+    # Maximum number of connected clients
+    "maxmemory-policy" = "allkeys-lru"
+    
+    # Notify keyspace events
+    "notify-keyspace-events" = ""
+  }
+
+  labels = merge(
+    {
+      environment = var.prefix
+      managed_by  = "terraform"
+    },
+    var.redis_labels
+  )
+
+  lifecycle {
+    prevent_destroy = false
+  }
+
+  depends_on = [
+    google_compute_network.dify_network,
+    google_service_networking_connection.private_vpc_connection
+  ]
+}
+
+# =============================================================================
+# Compute Instance
+# =============================================================================
+
+# Compute Instance with Docker
+resource "google_compute_instance" "dify_vm" {
+  name         = "${var.prefix}-vm"
+  machine_type = var.machine_type
+  zone         = var.zone
+  tags         = ["dify-instance"]
+
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      size  = var.disk_size_gb
+      type  = "pd-standard"
+    }
+  }
+
+  network_interface {
+    network    = google_compute_network.dify_network.name
+    subnetwork = google_compute_subnetwork.dify_subnet.name
+
+    access_config {
+      # Ephemeral public IP
+    }
+  }
+
+  metadata = {
+    ssh-keys = var.ssh_public_key != "" ? "${var.ssh_user}:${var.ssh_public_key}" : ""
+  }
+
+  metadata_startup_script = templatefile("${path.module}/startup-script.sh", {
+    docker_compose_version = var.docker_compose_version
+  })
+
+  service_account {
+    email  = google_service_account.dify_sa.email
+    scopes = ["cloud-platform"]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  # Deploy .env.example file to VM with Cloud SQL configuration
+  provisioner "file" {
+    content     = templatefile("${path.root}/.env.example", {
+      db_host                                      = google_sql_database_instance.dify_postgres.private_ip_address
+      database_user                                = var.db_user
+      database_password                            = var.db_password != "" ? var.db_password : random_password.db_password[0].result
+      database_name                                = var.db_name
+      pgvector_private_ip                          = var.enable_pgvector ? google_sql_database_instance.dify_pgvector[0].private_ip_address : "pgvector"
+      pgvector_database_user                       = var.enable_pgvector ? var.pgvector_db_user : "postgres"
+      pgvector_database_password                   = var.enable_pgvector ? (var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result) : "difyai123456"
+      pgvector_database_name                       = var.enable_pgvector ? var.pgvector_db_name : "dify"
+      gcs_bucket_name                              = google_storage_bucket.dify_storage.name
+      google_storage_service_account_json_base64   = var.create_service_account_key ? base64encode(google_service_account_key.dify_sa_key[0].private_key) : ""
+      redis_host                                   = var.enable_redis ? google_redis_instance.dify_redis[0].host : "redis"
+      redis_auth_string                            = var.enable_redis && var.redis_auth_enabled ? google_redis_instance.dify_redis[0].auth_string : ""
+    })
+    destination = "/tmp/.env.example"
+
+    connection {
+      type        = "ssh"
+      user        = var.ssh_user
+      private_key = var.ssh_private_key != "" ? var.ssh_private_key : null
+      host        = self.network_interface[0].access_config[0].nat_ip
+    }
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo mkdir -p /opt/dify",
+      "sudo mv /tmp/.env.example /opt/dify/.env.example",
+      "sudo chown -R ubuntu:ubuntu /opt/dify"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = var.ssh_user
+      private_key = var.ssh_private_key != "" ? var.ssh_private_key : null
+      host        = self.network_interface[0].access_config[0].nat_ip
+    }
+  }
+}
+
+# =============================================================================
+# Load Balancer Configuration
+# =============================================================================
+
+# Instance Group for Load Balancer
+resource "google_compute_instance_group" "dify_ig" {
+  name        = "${var.prefix}-ig"
+  description = "Dify instance group"
+  zone        = var.zone
+
+  instances = [
+    google_compute_instance.dify_vm.id,
+  ]
+
+  named_port {
+    name = "http"
+    port = "1080"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Health Check
+resource "google_compute_health_check" "dify_health_check" {
+  name                = "${var.prefix}-health-check"
+  check_interval_sec  = 10
+  timeout_sec         = 5
+  healthy_threshold   = 2
+  unhealthy_threshold = 3
+
+  http_health_check {
+    port         = 1080
+    request_path = "/health"
+  }
+}
+
+# Backend Service
+resource "google_compute_backend_service" "dify_backend" {
+  name                  = "${var.prefix}-backend"
+  protocol              = "HTTP"
+  port_name             = "http"
+  timeout_sec           = 30
+  enable_cdn            = false
+  health_checks         = [google_compute_health_check.dify_health_check.id]
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+
+  backend {
+    group           = google_compute_instance_group.dify_ig.id
+    balancing_mode  = "UTILIZATION"
+    capacity_scaler = 1.0
+  }
+}
+
+# URL Map
+resource "google_compute_url_map" "dify_url_map" {
+  name            = "${var.prefix}-url-map"
+  default_service = google_compute_backend_service.dify_backend.id
+}
+
+# SSL Certificate (Google-managed)
+resource "google_compute_managed_ssl_certificate" "dify_ssl_cert" {
+  count = var.domain_name != "" ? 1 : 0
+  name  = "${var.prefix}-ssl-cert"
+
+  managed {
+    domains = [var.domain_name]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Self-signed SSL Certificate (for testing without domain)
+resource "google_compute_ssl_certificate" "dify_self_signed" {
+  count       = var.domain_name == "" ? 1 : 0
+  name        = "${var.prefix}-self-signed-cert"
+  private_key = var.ssl_private_key
+  certificate = var.ssl_certificate
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# HTTPS Proxy
+resource "google_compute_target_https_proxy" "dify_https_proxy" {
+  name    = "${var.prefix}-https-proxy"
+  url_map = google_compute_url_map.dify_url_map.id
+  ssl_certificates = var.domain_name != "" ? [
+    google_compute_managed_ssl_certificate.dify_ssl_cert[0].id
+    ] : [
+    google_compute_ssl_certificate.dify_self_signed[0].id
+  ]
+}
+
+# Global Forwarding Rule (HTTPS)
+resource "google_compute_global_forwarding_rule" "dify_https_forwarding_rule" {
+  name                  = "${var.prefix}-https-forwarding-rule"
+  ip_protocol           = "TCP"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  port_range            = "443"
+  target                = google_compute_target_https_proxy.dify_https_proxy.id
+  ip_address            = google_compute_global_address.dify_lb_ip.id
 }
