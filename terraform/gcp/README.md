@@ -47,6 +47,43 @@
    gcloud services enable sqladmin.googleapis.com
    ```
 
+## SSHキーの生成
+
+VMへのアクセスにはSSHキーが必要です。以下の手順でSSHキーペアを生成します。
+
+### 方法1: ssh/ディレクトリに配置（推奨）
+
+```bash
+# 1. ED25519形式のSSHキーペアを生成（推奨）
+ssh-keygen -t ed25519 -f ssh/id_ed25519
+
+# パスフレーズを設定するか、空のままEnterを押す
+# パスフレーズを設定した場合、Terraform実行時に毎回入力が必要
+```
+
+**注意**: `locals.tf`が自動的に`ssh/`ディレクトリ内のキーを読み込みます。`terraform.tfvars`での設定は不要です。
+
+### 方法2: 既存のSSHキーを使用
+
+既存のSSHキー（例: `~/.ssh/id_ed25519`）がある場合:
+
+```bash
+# ssh/ディレクトリにコピー
+mkdir -p ssh
+cp ~/.ssh/id_ed25519 ssh/
+cp ~/.ssh/id_ed25519.pub ssh/
+
+# パーミッションを確認
+chmod 600 ssh/id_ed25519
+chmod 644 ssh/id_ed25519.pub
+```
+
+**セキュリティのベストプラクティス**:
+- 秘密鍵には必ずパスフレーズを設定することを推奨
+- 秘密鍵のパーミッションは`600`に設定
+- 秘密鍵はGitにコミットしない（`.gitignore`で除外済み）
+- 本番環境では、SSHアクセス元IPを`ssh_source_ranges`で制限
+
 ## クイックスタート
 
 ### 1. 変数ファイルの準備
