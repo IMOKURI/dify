@@ -539,7 +539,7 @@ resource "google_compute_instance" "dify_vm" {
   }
 
   metadata = {
-    ssh-keys = var.ssh_public_key != "" ? "${var.ssh_user}:${var.ssh_public_key}" : ""
+    ssh-keys = local.ssh_public_key_content != "" ? "${var.ssh_user}:${local.ssh_public_key_content}" : ""
   }
 
   metadata_startup_script = templatefile("${path.module}/startup-script.sh", {
@@ -576,7 +576,7 @@ resource "google_compute_instance" "dify_vm" {
     connection {
       type        = "ssh"
       user        = var.ssh_user
-      private_key = var.ssh_private_key != "" ? var.ssh_private_key : null
+      private_key = local.ssh_private_key_content != "" ? local.ssh_private_key_content : null
       host        = self.network_interface[0].access_config[0].nat_ip
     }
   }
@@ -591,7 +591,7 @@ resource "google_compute_instance" "dify_vm" {
     connection {
       type        = "ssh"
       user        = var.ssh_user
-      private_key = var.ssh_private_key != "" ? var.ssh_private_key : null
+      private_key = local.ssh_private_key_content != "" ? local.ssh_private_key_content : null
       host        = self.network_interface[0].access_config[0].nat_ip
     }
   }

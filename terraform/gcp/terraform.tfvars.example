@@ -15,8 +15,12 @@ disk_size_gb  = 50
 
 # SSH Configuration
 ssh_user           = "ubuntu"
+# Option 1: Place your SSH keys in ssh/ directory (locals.tf will auto-read them)
+# - ssh/id_ed25519.pub
+# - ssh/id_ed25519
+# Option 2: Set the keys as string values here (not recommended for private keys)
 ssh_public_key     = "" # Your SSH public key (optional)
-ssh_private_key    = "" # Your SSH private key for provisioning (required when deploying .env.example)
+ssh_private_key    = "" # Your SSH private key for provisioning (optional, use ssh/ directory instead)
 ssh_source_ranges  = ["0.0.0.0/0"] # Restrict this in production!
 
 # SSL Configuration
@@ -53,7 +57,7 @@ create_service_account_key = true
 
 # Enable separate Cloud SQL instance for pgvector
 # Set to true to create a dedicated PostgreSQL instance with pgvector extension
-enable_pgvector = false
+enable_pgvector = true
 
 # When enable_pgvector = true, configure the following:
 
