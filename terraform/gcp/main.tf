@@ -567,7 +567,7 @@ resource "google_compute_instance" "dify_vm" {
       pgvector_database_password                 = var.enable_pgvector ? (var.pgvector_db_password != "" ? var.pgvector_db_password : random_password.pgvector_db_password[0].result) : "difyai123456"
       pgvector_database_name                     = var.enable_pgvector ? var.pgvector_db_name : "dify"
       gcs_bucket_name                            = google_storage_bucket.dify_storage.name
-      google_storage_service_account_json_base64 = var.create_service_account_key ? base64encode(google_service_account_key.dify_sa_key[0].private_key) : ""
+      google_storage_service_account_json_base64 = var.create_service_account_key ? google_service_account_key.dify_sa_key[0].private_key : ""
       redis_host                                 = var.enable_redis ? google_redis_instance.dify_redis[0].host : "redis"
       redis_auth_string                          = var.enable_redis && var.redis_auth_enabled ? google_redis_instance.dify_redis[0].auth_string : ""
     })

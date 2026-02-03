@@ -27,10 +27,6 @@ systemctl start docker
 # Install additional tools
 apt-get install -y git curl wget vim nano htop
 
-# Create working directory
-mkdir -p /opt/dify
-chown ubuntu:ubuntu /opt/dify
-
 # Install Nginx for reverse proxy (optional)
 apt-get install -y nginx
 
@@ -72,66 +68,5 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl enable nginx
 systemctl restart nginx
-
-# Create startup instructions
-cat > /opt/dify/README.md << 'EOF'
-# Dify Deployment Instructions
-
-## Deploy Dify
-
-**Note:** Dify source code has been automatically downloaded and placed in `/opt/dify`.
-
-1. Navigate to the Dify docker directory:
-   ```bash
-   cd /opt/dify/docker
-   ```
-
-2. Copy and configure environment variables:
-   ```bash
-   # Use the pre-configured .env.example if available
-   cp /opt/dify/.env.example .env
-   
-   # Or use the default from Dify repository
-   # cp .env.example .env
-   
-   # Edit .env file with your configuration
-   nano .env
-   ```
-
-3. Start Dify with Docker Compose:
-   ```bash
-   docker-compose up -d
-   ```
-
-4. Check the status:
-   ```bash
-   docker-compose ps
-   docker-compose logs -f
-   ```
-
-## Useful Commands
-
-- Stop services: `docker-compose down`
-- View logs: `docker-compose logs -f [service_name]`
-- Restart services: `docker-compose restart`
-- Update Dify to a new version:
-  ```bash
-  cd /opt/dify
-  # Download new version (replace X.Y.Z with desired version)
-  curl -L https://github.com/langgenius/dify/archive/refs/tags/X.Y.Z.tar.gz -o dify-X.Y.Z.tar.gz
-  tar -xzf dify-X.Y.Z.tar.gz
-  cp -r dify-X.Y.Z/* .
-  rm -rf dify-X.Y.Z dify-X.Y.Z.tar.gz
-  cd docker
-  docker-compose pull
-  docker-compose up -d
-  ```
-
-## Access
-
-The application will be available at the Load Balancer IP address.
-EOF
-
-chown -R ubuntu:ubuntu /opt/dify
 
 echo "Setup completed successfully!" > /var/log/startup-script.log
