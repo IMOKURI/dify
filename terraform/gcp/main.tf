@@ -585,7 +585,7 @@ resource "google_compute_instance" "dify_vm" {
   provisioner "remote-exec" {
     inline = [
       "curl -L https://github.com/langgenius/dify/archive/refs/tags/${var.dify_version}.tar.gz -o /tmp/dify-${var.dify_version}.tar.gz",
-      "sudo tar -xzf /tmp/dify-${var.dify_version}.tar.gz" -C /opt/,
+      "sudo tar -xzf /tmp/dify-${var.dify_version}.tar.gz -C /opt/",
       "sudo mv /tmp/.env /opt/dify-${var.dify_version}/docker/.env",
       "sudo chown -R ubuntu:ubuntu /opt/dify"
     ]
