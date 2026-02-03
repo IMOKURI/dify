@@ -42,13 +42,14 @@ cp .env.example .env
 # Database Configuration
 sed -i "s|^DB_HOST=.*|DB_HOST=${db_host}|" .env
 sed -i "s|^DB_USER=.*|DB_USER=${database_user}|" .env
-sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${database_password}|" .env
+sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD='${database_password}'|" .env
 sed -i "s|^DB_DATABASE=.*|DB_DATABASE=${database_name}|" .env
 
 # pgvector Configuration
+sed -i "s|^VECTOR_STORE=.*|VECTOR_STORE=pgvector|" .env
 sed -i "s|^PGVECTOR_HOST=.*|PGVECTOR_HOST=${pgvector_private_ip}|" .env
 sed -i "s|^PGVECTOR_USER=.*|PGVECTOR_USER=${pgvector_database_user}|" .env
-sed -i "s|^PGVECTOR_PASSWORD=.*|PGVECTOR_PASSWORD=${pgvector_database_password}|" .env
+sed -i "s|^PGVECTOR_PASSWORD=.*|PGVECTOR_PASSWORD='${pgvector_database_password}'|" .env
 sed -i "s|^PGVECTOR_DATABASE=.*|PGVECTOR_DATABASE=${pgvector_database_name}|" .env
 
 # GCS Configuration
@@ -58,7 +59,9 @@ sed -i "s|^GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64=.*|GOOGLE_STORAGE_SERVICE_
 
 # Redis Configuration
 sed -i "s|^REDIS_HOST=.*|REDIS_HOST=${redis_host}|" .env
-sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=${redis_auth_string}|" .env
+sed -i "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD='${redis_auth_string}'|" .env
+sed -i "s|^CELERY_BROKER_URL=.*|CELERY_BROKER_URL='redis://:${redis_auth_string}@${redis_host}:6379/1'|" .env
+sed -i "s|^CELERY_SENTINEL_PASSWORD=.*|CELERY_SENTINEL_PASSWORD='${redis_auth_string}'|" .env
 
 # Start Dify with Docker Compose
 sudo -u ubuntu docker-compose up -d
